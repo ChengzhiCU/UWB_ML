@@ -19,8 +19,8 @@ class UWBDataset(data.Dataset):
 
         if is_norm:
             feature = self.labeled_data['extracted_features']
-            self.feature_norm = (feature - np.mean(feature)) / np.std(feature)
-
+            self.feature_norm = (feature - np.mean(feature, axis=0)) / np.std(feature, axis=0)
+            # norm the element of features seperately, as the features have very different mean and std
 
     def __len__(self):
         return self.index_list.shape[0]
