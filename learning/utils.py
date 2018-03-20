@@ -1,8 +1,10 @@
 from config import *
 import torch
 import torch.nn.functional as F
-from torch.autograd import Variable
 import zipfile, tempfile, glob
+import torch
+import torch.nn.functional as F
+from torch.autograd import Variable
 
 
 def save_model(model_names, models, output_folder, epoch, metric):
@@ -70,3 +72,8 @@ def set_dropout_mode(models, train):
             else:
                 model.eval()
         set_dropout_mode(model, train)
+
+def full_mse_loss(pred, label):
+    loss = F.mse_loss(pred, label, size_average=False)
+    loss = loss / pred.size(1) / pred.size(0)
+    return loss

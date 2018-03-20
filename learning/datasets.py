@@ -1,27 +1,46 @@
 from __future__ import print_function
 from torch.utils import data
 import numpy as np
-import config
-
+from config import *
+import os
 
 class UWBDataset(data.Dataset):
-
-    def __init__(self, labeled_path, unlabelled_path, batchsize, mode):
+    def __init__(self, labeled_path, unlabelled_path, train_index_file, is_norm=True):
         self.labeled_path = labeled_path
-        self.unlabeled_path = unlabelled_path
+        self.labeled_data = np.load(self.labeled_path)[()]
+        self.is_norm = is_norm
 
-        self.labeled_data = np.load(self.labeled_data)
-        self.unlabeled_data = np.load(self.unlabeled_data)
+        if len(unlabelled_path) > 0:
+            self.unlabeled_path = unlabelled_path
+            self.unlabeled_data = np.load(self.unlabeled_data)[()]
 
-        labeled_all_data_num = self.labeled_data['label'].shape[0] ####
+        self.index_list = np.load(train_index_file)
+        print('index size', self.index_list.shape)
 
-        try:
-            if mode == 'train':
-                index_list = np.load('index_list.npz')['train']
-            if mode == 'test':
-                index_list = np.load('index_list.npz')['test']
-        except:
+        if is_norm:
+            feature = self.labeled_data['extracted_features']
+            self.feature_norm = (feature - np.mean(feature)) / np.std(feature)
 
-            train_index_num = labeled_all_data_num - config.test_data_num
+
+    def __len__(self):
+        return self.index_list.shape[0]
+
+    def __getitem__(self, index):
+        data_index = self.index_list[index]
+        wave = self.labeled_data['wave'][data_index]
+        feature = self.labeled_data['extracted_features'][data_index]
+        label = self.labeled_data['label'][data_index]
+
+        label = label - feature[0]
+        subject = self.labeled_data['subject'][data_index]
+
+        if self.is_norm:
+            feature = self.feature_norm[data_index]
+
+        return feature, label, subject
+
+
+
+
 
 
