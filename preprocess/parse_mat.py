@@ -4,7 +4,6 @@ import shutil
 import scipy.io
 
 class ParseMAt:
-
     def __init__(self, overwrite):
         self.overwrite = overwrite
         self.input_path = MatDataPath
@@ -79,15 +78,17 @@ class ParseMAt:
         np.save(os.path.join(self.save_path, 'all_{}'.format(len(filelist))), all_data)
 
         data_num = all_label.shape[0]
-        train_data_ind = [i for i in range(data_num) if i%5]
-        test_data_ind = [i for i in range(data_num) if not i%5]
+        # train_data_ind = [i for i in range(data_num) if i%5]
+        # test_data_ind = [i for i in range(data_num) if  i%5==0]
+        train_data_ind = [i for i in range(data_num) if i < int(data_num * 0.8)]
+        test_data_ind = [i for i in range(data_num) if i >= int(data_num * 0.8)]
 
         # random
         # train_data_ind = np.random.choice(data_num, int(data_num * 0.8), replace=False)
         # or you can permutate and pick up the first 80% data
         # test_data_ind = [i for i in range(data_num) if not i%5]
-        np.save(os.path.join(self.save_path, 'train_ind'), train_data_ind)
-        np.save(os.path.join(self.save_path, 'test_ind'), train_data_ind)
+        np.save(os.path.join(self.save_path, 'train_ind_sep'), train_data_ind)
+        np.save(os.path.join(self.save_path, 'test_ind_sep'), test_data_ind)
 
 
 

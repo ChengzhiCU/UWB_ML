@@ -3,6 +3,7 @@ import time
 from learning.utils import *
 from learning.log import *
 from torch.autograd import Variable
+import torch
 
 def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
     for model in models:
@@ -18,6 +19,8 @@ def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
 
     num_per_epoch = len(data_loader)
     loss_all = 0
+    loss_mse_all = 0
+    loss_var_all = 0
     loss_cnt = 0
 
     for idx, icml_data in enumerate(data_loader, 1):
@@ -27,8 +30,16 @@ def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
         input = Variable(input.cuda())
         labels = Variable(labels.cuda())
 
-        predict = enc.forward(input)
-        loss = full_mse_loss(predict, labels)
+        if 'npn' in args.enc_type:
+            a_m, a_s = enc.forward(input)
+            loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / a_s + args.lambda_ * a_s)
+            loss = loss / a_m.size(1) / a_m.size(0)
+
+            mse_loss = torch.sum((a_m - labels) ** 2) / a_m.size(1) / a_m.size(0)
+            var_loss = torch.sum(a_s ** 2) / a_m.size(1) / a_m.size(0)
+        else:
+            predict = enc.forward(input)
+            loss = full_mse_loss(predict, labels)
 
         for model in models:
             model.zero_grad()
@@ -36,10 +47,17 @@ def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
         opt_non_discr.step()
 
         loss_all += loss.data[0]
+        if 'npn' in args.enc_type:
+            loss_mse_all += mse_loss.data[0]
+            loss_var_all += var_loss.data[0]
         loss_cnt += 1.0
-
-    print("epoch {}:                train loss = {}".format(epoch, loss_all/loss_cnt))
-    return loss_all/loss_cnt
+    if 'npn' in args.enc_type:
+        print("epoch {}:                train loss = {} certainty = {}  mse_square_loss = {}"
+              .format(epoch, loss_all/loss_cnt, (loss_var_all/loss_cnt) ** 0.5, loss_mse_all/loss_cnt))
+        return loss_mse_all/loss_cnt
+    else:
+        print("epoch {}:                train loss = {}".format(epoch, loss_all / loss_cnt))
+        return loss_all/loss_cnt
 
 
 def val_loop(models, data_loader, epoch, args):
@@ -51,6 +69,8 @@ def val_loop(models, data_loader, epoch, args):
     num_per_epoch = len(data_loader)
     loss_all = 0
     loss_cnt = 0
+    loss_mse_all = 0
+    loss_var_all = 0
 
     for idx, icml_data in enumerate(data_loader, 1):
         if idx > num_per_epoch:
@@ -59,14 +79,30 @@ def val_loop(models, data_loader, epoch, args):
         input = Variable(input.cuda())
         labels = Variable(labels.cuda())
 
-        predict = enc.forward(input)
-        loss = full_mse_loss(predict, labels)
+        # predict = enc.forward(input)
+        # loss = full_mse_loss(predict, labels)
+        if 'npn' in args.enc_type:
+            a_m, a_s = enc.forward(input)
+            loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / a_s + args.lambda_ * a_s)
+            loss = loss / a_m.size(1) / a_m.size(0)
 
-        for model in models:
-            model.zero_grad()
+            mse_loss = torch.sum((a_m - labels) ** 2) / a_m.size(1) / a_m.size(0)
+            var_loss = torch.sum(a_s ** 2) / a_m.size(1) / a_m.size(0)
+        else:
+            predict = enc.forward(input)
+            loss = full_mse_loss(predict, labels)
 
         loss_all += loss.data[0]
+        if 'npn' in args.enc_type:
+            loss_mse_all += mse_loss.data[0]
+            loss_var_all += var_loss.data[0]
         loss_cnt += 1.0
 
-    print("epoch {}: val loss = {}".format(epoch, loss_all/loss_cnt))
-    return loss_all/loss_cnt
+    if 'npn' in args.enc_type:
+        print("val loss = {}  certainty_variance = {} mse_square_loss = {}".format(loss_all/loss_cnt,
+                                                                                   (loss_var_all/loss_cnt) ** 0.5,
+                                                                                   loss_mse_all/loss_cnt))
+        return loss_mse_all/loss_cnt
+    else:
+        print("val loss = {}".format(loss_all / loss_cnt))
+        return loss_all/loss_cnt
