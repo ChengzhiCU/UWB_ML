@@ -16,7 +16,7 @@ import torch
 parser = argparse.ArgumentParser(description='RF-Sleep Training Script')
 parser.add_argument('--workers', '-j', default=1, type=int, help='number of data loading workers')
 parser.add_argument('--batch', type=int, default=64, help='input batch size')
-parser.add_argument('--epochs', default=650, type=int, help='number of epochs to run')
+parser.add_argument('--epochs', default=30, type=int, help='number of epochs to run')
 parser.add_argument('--seed', default=2000, type=int, help='manual seed')
 parser.add_argument('--ngpu', default=1, type=int, help='number of GPUs to use')
 parser.add_argument('--checkpoint', type=str, help='location of the checkpoint to load')
@@ -28,7 +28,7 @@ parser.add_argument('--evaluate', action='store_true', help='evaluate model on v
 
 parser.add_argument('--train-epoch', default=1, type=int, help='begining epoch No., just for saving model')
 parser.add_argument('--lr', default=5e-3, type=float, help='learning rate')
-parser.add_argument('--lambda_', default=0.5, type=float, help='ratio of mse and variance')
+parser.add_argument('--lambda_', default=0.3, type=float, help='ratio of mse and variance')
 
 parser.set_defaults(augment=True)
 args = parser.parse_args()
@@ -120,6 +120,9 @@ if args.evaluate:
 
 metric = 99999999999
 best_epoch = 0
+
+fp = open(os.path.join(args.output, 'log.txt'), 'a')
+args.fp = fp
 for epoch in range(args.epochs):
 
     print("")
@@ -131,4 +134,7 @@ for epoch in range(args.epochs):
         best_epoch = epoch
         save_model(model_names, models, args.output, epoch, metric)  # save models to one zip file
 
-print('best test loss = {},  in meter average error = {}, epoch = {}'.format(metric, metric ** 0.5, best_epoch))
+output_str = 'best test loss = {},  in meter average error = {}, epoch = {}\n'.format(metric, metric ** 0.5, best_epoch)
+print(output_str)
+args.fp.write(output_str)
+args.fp.close()

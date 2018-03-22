@@ -52,11 +52,15 @@ def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
             loss_var_all += var_loss.data[0]
         loss_cnt += 1.0
     if 'npn' in args.enc_type:
-        print("epoch {}:                train loss = {} certainty = {}  mse_square_loss = {}"
-              .format(epoch, loss_all/loss_cnt, (loss_var_all/loss_cnt) ** 0.5, loss_mse_all/loss_cnt))
+        string_out = "epoch {}:                train loss = {} certainty = {}  mse_square_loss = {}\n" \
+              .format(epoch, loss_all/loss_cnt, (loss_var_all/loss_cnt) ** 0.5, loss_mse_all/loss_cnt)
+        print(string_out)
+        args.fp.write(string_out)
         return loss_mse_all/loss_cnt
     else:
-        print("epoch {}:                train loss = {}".format(epoch, loss_all / loss_cnt))
+        string_out = "epoch {}:                train loss = {}\n".format(epoch, loss_all / loss_cnt)
+        print(string_out)
+        args.fp.write(string_out)
         return loss_all/loss_cnt
 
 
@@ -99,10 +103,14 @@ def val_loop(models, data_loader, epoch, args):
         loss_cnt += 1.0
 
     if 'npn' in args.enc_type:
-        print("val loss = {}  certainty_variance = {} mse_square_loss = {}".format(loss_all/loss_cnt,
+        string_out = "val loss = {}  certainty_variance = {} mse_square_loss = {}\n".format(loss_all/loss_cnt,
                                                                                    (loss_var_all/loss_cnt) ** 0.5,
-                                                                                   loss_mse_all/loss_cnt))
-        return loss_mse_all/loss_cnt
+                                                                                   loss_mse_all/loss_cnt)
+        print(string_out)
+        args.fp.write(string_out)
+        return loss_mse_all/loss_cnt, loss_all/loss_cnt, (loss_var_all/loss_cnt) ** 0.5
     else:
-        print("val loss = {}".format(loss_all / loss_cnt))
+        string_out = "val loss = {}\n".format(loss_all / loss_cnt)
+        print(string_out)
+        args.fp.write(string_out)
         return loss_all/loss_cnt
