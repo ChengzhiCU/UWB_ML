@@ -19,7 +19,9 @@ class UWBDataset(data.Dataset):
 
         if is_norm:
             feature = self.labeled_data['extracted_features']
+            wave = self.labeled_data['wave']
             self.feature_norm = (feature - np.mean(feature, axis=0)) / np.std(feature, axis=0)
+            self.wave_norm = (wave - np.mean(wave, axis=0)) / np.std(wave, axis=0)
             # norm the element of features seperately, as the features have very different mean and std
             # based on the observation of the data, performance is improved by 150%
 
@@ -37,8 +39,9 @@ class UWBDataset(data.Dataset):
 
         if self.is_norm:
             feature = self.feature_norm[data_index]
+            wave = self.wave_norm[data_index]
 
-        return feature, label, subject
+        return feature, label, subject, wave
 
 
 

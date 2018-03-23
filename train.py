@@ -20,7 +20,7 @@ parser.add_argument('--epochs', default=30, type=int, help='number of epochs to 
 parser.add_argument('--seed', default=2000, type=int, help='manual seed')
 parser.add_argument('--ngpu', default=1, type=int, help='number of GPUs to use')
 parser.add_argument('--checkpoint', type=str, help='location of the checkpoint to load')
-parser.add_argument('--enc_type', default='mlp', type=str, help='type of models')
+parser.add_argument('--enc_type', default='cnn', type=str, help='type of models')
 parser.add_argument('--output', default=time.strftime('%m-%d-%H-%M'),
                     type=str, help='folder to output model checkpoints')
 parser.add_argument('--print-freq', default=20, type=int, help='print frequency')

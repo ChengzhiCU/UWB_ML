@@ -26,9 +26,10 @@ def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
     for idx, icml_data in enumerate(data_loader, 1):
         if idx > num_per_epoch:
             break
-        input, labels, subject = icml_data
+        input, labels, subject, wave = icml_data
         input = Variable(input.cuda())
         labels = Variable(labels.cuda())
+        wave = Variable(wave.cuda())
 
         if 'npn' in args.enc_type:
             a_m, a_s = enc.forward(input)
@@ -37,6 +38,9 @@ def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
 
             mse_loss = torch.sum((a_m - labels) ** 2) / a_m.size(1) / a_m.size(0)
             var_loss = torch.sum(a_s ** 2) / a_m.size(1) / a_m.size(0)
+        if 'cnn' in args.enc_type:
+            predict = enc.forward(wave)
+            loss = full_mse_loss(predict, labels)
         else:
             predict = enc.forward(input)
             loss = full_mse_loss(predict, labels)
@@ -79,9 +83,10 @@ def val_loop(models, data_loader, epoch, args):
     for idx, icml_data in enumerate(data_loader, 1):
         if idx > num_per_epoch:
             break
-        input, labels, subject = icml_data
+        input, labels, subject, wave = icml_data
         input = Variable(input.cuda())
         labels = Variable(labels.cuda())
+        wave = Variable(wave.cuda())
 
         # predict = enc.forward(input)
         # loss = full_mse_loss(predict, labels)
@@ -92,6 +97,9 @@ def val_loop(models, data_loader, epoch, args):
 
             mse_loss = torch.sum((a_m - labels) ** 2) / a_m.size(1) / a_m.size(0)
             var_loss = torch.sum(a_s ** 2) / a_m.size(1) / a_m.size(0)
+        if 'cnn' in args.enc_type:
+            predict = enc.forward(wave)
+            loss = full_mse_loss(predict, labels)
         else:
             predict = enc.forward(input)
             loss = full_mse_loss(predict, labels)
