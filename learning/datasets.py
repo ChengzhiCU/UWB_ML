@@ -39,6 +39,7 @@ class UWBDataset(data.Dataset):
 
         if self.is_norm:
             feature = self.feature_norm[data_index]
+            # feature[0] = 0 #####
             wave = self.wave_norm[data_index]
 
         return feature, label, subject, wave

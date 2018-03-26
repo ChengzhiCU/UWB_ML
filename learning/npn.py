@@ -21,12 +21,13 @@ class NPNLinear(nn.Module):
             y = - torch.log(1 / x - 1)
         return y
 
-    def __init__(self, in_channels, out_channels, dual_input = True, init_type = 0):
+    def __init__(self, in_channels, out_channels, dual_input=True, init_type=0, first_layer_assign=False):
         # init_type 0: normal, 1: mixture of delta distr'
         super(NPNLinear, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.dual_input = dual_input
+        self.first_layer_assign = first_layer_assign
 
         self.W_m = nn.Parameter(2 * math.sqrt(6) / math.sqrt(in_channels + out_channels) * (torch.rand(in_channels, out_channels) - 0.5))
         if init_type == 0:
@@ -59,6 +60,8 @@ class NPNLinear(nn.Module):
             #x_s = Variable(torch.zeros(x_m.size()))
             x_s = x.clone()
             x_s = 0 * x_s
+            if self.first_layer_assign:
+                x_s[:, 0] = 0.3657
 
         o_m = torch.mm(x_m, self.W_m)
         o_m = o_m + self.bias_m.expand_as(o_m)

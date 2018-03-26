@@ -16,11 +16,12 @@ import torch
 parser = argparse.ArgumentParser(description='RF-Sleep Training Script')
 parser.add_argument('--workers', '-j', default=1, type=int, help='number of data loading workers')
 parser.add_argument('--batch', type=int, default=64, help='input batch size')
-parser.add_argument('--epochs', default=30, type=int, help='number of epochs to run')
+parser.add_argument('--epochs', default=200, type=int, help='number of epochs to run')
 parser.add_argument('--seed', default=2000, type=int, help='manual seed')
 parser.add_argument('--ngpu', default=1, type=int, help='number of GPUs to use')
+parser.add_argument('--cnn_width', default=16, type=int, help='number of channels for first layer cnn')
 parser.add_argument('--checkpoint', type=str, help='location of the checkpoint to load')
-parser.add_argument('--enc_type', default='cnn', type=str, help='type of models')
+parser.add_argument('--enc_type', default='combined_dis', type=str, help='type of models')
 parser.add_argument('--output', default=time.strftime('%m-%d-%H-%M'),
                     type=str, help='folder to output model checkpoints')
 parser.add_argument('--print-freq', default=20, type=int, help='print frequency')
@@ -33,13 +34,12 @@ parser.add_argument('--lambda_', default=0.3, type=float, help='ratio of mse and
 parser.set_defaults(augment=True)
 args = parser.parse_args()
 
-
 np.random.seed(args.seed)
 random.seed(args.seed)
 torch.manual_seed(int(args.seed))
 
 # setup output folder
-args.output = os.path.join(MODEL_PATH, args.output)
+args.output = os.path.join(MODEL_PATH, args.output + '_' + args.enc_type)
 if os.path.exists(args.output):
     if query_yes_no('overwrite previous folder?'):
         shutil.rmtree(args.output)
@@ -99,7 +99,7 @@ models = [enc]
 opt_non_D = optim.Adam(enc.parameters(), lr=args.lr)
 optimizers = [opt_non_D]
 
-lr_scheduler_non_D = lr_scheduler.ExponentialLR(optimizer=opt_non_D, gamma=0.5 ** (1/500))
+lr_scheduler_non_D = lr_scheduler.ExponentialLR(optimizer=opt_non_D, gamma=0.5 ** (1/100))
 lr_schedulers = [lr_scheduler_non_D]
 
 # optionally load model from a checkpoint

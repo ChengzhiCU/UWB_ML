@@ -5,6 +5,7 @@ from learning.log import *
 from torch.autograd import Variable
 import torch
 
+
 def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
     for model in models:
         model.train()
@@ -33,12 +34,23 @@ def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
 
         if 'npn' in args.enc_type:
             a_m, a_s = enc.forward(input)
-            loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / a_s + args.lambda_ * a_s)
+            loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * torch.log(a_s))
             loss = loss / a_m.size(1) / a_m.size(0)
 
             mse_loss = torch.sum((a_m - labels) ** 2) / a_m.size(1) / a_m.size(0)
             var_loss = torch.sum(a_s ** 2) / a_m.size(1) / a_m.size(0)
-        if 'cnn' in args.enc_type:
+        elif 'combined' in args.enc_type:
+            if 'dis' in args.enc_type:
+                dis = input[:, 0]
+                a_m, a_s = enc.forward((wave, dis))
+            else:
+                a_m, a_s = enc.forward(wave)
+            loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * torch.log(a_s))
+            loss = loss / a_m.size(1) / a_m.size(0)
+
+            mse_loss = torch.sum((a_m - labels) ** 2) / a_m.size(1) / a_m.size(0)
+            var_loss = torch.sum(a_s ** 2) / a_m.size(1) / a_m.size(0)
+        elif 'cnn' in args.enc_type:
             predict = enc.forward(wave)
             loss = full_mse_loss(predict, labels)
         else:
@@ -51,18 +63,18 @@ def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
         opt_non_discr.step()
 
         loss_all += loss.data[0]
-        if 'npn' in args.enc_type:
+        if 'npn' in args.enc_type or 'combined' in args.enc_type:
             loss_mse_all += mse_loss.data[0]
             loss_var_all += var_loss.data[0]
         loss_cnt += 1.0
-    if 'npn' in args.enc_type:
-        string_out = "epoch {}:                train loss = {} certainty = {}  mse_square_loss = {}\n" \
-              .format(epoch, loss_all/loss_cnt, (loss_var_all/loss_cnt) ** 0.5, loss_mse_all/loss_cnt)
+    if 'npn' in args.enc_type or 'combined' in args.enc_type:
+        string_out = "{} epoch {}:                train loss = {} certainty = {}  mse_square_loss = {}\n" \
+              .format(args.enc_type, epoch, loss_all/loss_cnt, (loss_var_all/loss_cnt) ** 0.5, loss_mse_all/loss_cnt)
         print(string_out)
         args.fp.write(string_out)
         return loss_mse_all/loss_cnt
     else:
-        string_out = "epoch {}:                train loss = {}\n".format(epoch, loss_all / loss_cnt)
+        string_out = "{} epoch {}:                train loss = {}\n".format(args.enc_type, epoch, loss_all / loss_cnt)
         print(string_out)
         args.fp.write(string_out)
         return loss_all/loss_cnt
@@ -92,12 +104,23 @@ def val_loop(models, data_loader, epoch, args):
         # loss = full_mse_loss(predict, labels)
         if 'npn' in args.enc_type:
             a_m, a_s = enc.forward(input)
-            loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / a_s + args.lambda_ * a_s)
+            loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * torch.log(a_s))
             loss = loss / a_m.size(1) / a_m.size(0)
 
             mse_loss = torch.sum((a_m - labels) ** 2) / a_m.size(1) / a_m.size(0)
             var_loss = torch.sum(a_s ** 2) / a_m.size(1) / a_m.size(0)
-        if 'cnn' in args.enc_type:
+        elif 'combined' in args.enc_type:
+            if 'dis' in args.enc_type:
+                dis = input[:, 0]
+                a_m, a_s = enc.forward((wave, dis))
+            else:
+                a_m, a_s = enc.forward(wave)
+            loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * torch.log(a_s))
+            loss = loss / a_m.size(1) / a_m.size(0)
+
+            mse_loss = torch.sum((a_m - labels) ** 2) / a_m.size(1) / a_m.size(0)
+            var_loss = torch.sum(a_s ** 2) / a_m.size(1) / a_m.size(0)
+        elif 'cnn' in args.enc_type:
             predict = enc.forward(wave)
             loss = full_mse_loss(predict, labels)
         else:
@@ -105,18 +128,18 @@ def val_loop(models, data_loader, epoch, args):
             loss = full_mse_loss(predict, labels)
 
         loss_all += loss.data[0]
-        if 'npn' in args.enc_type:
+        if 'npn' in args.enc_type or 'combined' in args.enc_type:
             loss_mse_all += mse_loss.data[0]
             loss_var_all += var_loss.data[0]
         loss_cnt += 1.0
 
-    if 'npn' in args.enc_type:
+    if 'npn' in args.enc_type or 'combined' in args.enc_type:
         string_out = "val loss = {}  certainty_variance = {} mse_square_loss = {}\n".format(loss_all/loss_cnt,
                                                                                    (loss_var_all/loss_cnt) ** 0.5,
                                                                                    loss_mse_all/loss_cnt)
         print(string_out)
         args.fp.write(string_out)
-        return loss_mse_all/loss_cnt, loss_all/loss_cnt, (loss_var_all/loss_cnt) ** 0.5
+        return loss_mse_all/loss_cnt
     else:
         string_out = "val loss = {}\n".format(loss_all / loss_cnt)
         print(string_out)

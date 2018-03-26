@@ -69,7 +69,7 @@ class Enc(nn.Module):
             self.bn2 = nn.BatchNorm1d(width)
         elif self.type == 'npn':
             width = 128
-            self.fc1 = NPNLinear(INPUT_DIM, width, dual_input=False)
+            self.fc1 = NPNLinear(INPUT_DIM, width, dual_input=False, first_layer_assign=True)
             self.nonlinear1 = NPNRelu()
             # self.dropout1 = NPNDropout(self.fc_drop)
             self.fc2 = NPNLinear(width, 1)
@@ -90,6 +90,62 @@ class Enc(nn.Module):
             # 16 left
             self.pooling = nn.AvgPool1d(kernel_size=16, stride=16)
             self.fc1 = nn.Linear(width * 4, 1)
+        elif self.type == 'cnn1':
+            width = args.cnn_width
+            self.conv0 = nn.Conv1d(1, width, kernel_size=3, stride=2, padding=4)
+            self.block0 = BottleNeck1d_3(in_channels=width, hidden_channels=width // 4,
+                                         out_channels=width, stride=2, kernel_size=3, group_num=width // 8)
+            self.block1 = BottleNeck1d_3(in_channels=width, hidden_channels=width//2,
+                                         out_channels=width * 2, stride=2, kernel_size=3, group_num=width//4)
+            self.block2 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width//2,
+                                         out_channels=width * 2, stride=2, kernel_size=3, group_num=width//4)
+            self.block3 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2)
+            self.block4 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2)
+            self.block5 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2)
+            # 16 left
+            self.pooling = nn.AvgPool1d(kernel_size=8, stride=8)
+            self.fc1 = nn.Linear(width * 4, 1)
+        elif self.type == 'combined':
+            width = 16
+            self.conv0 = nn.Conv1d(1, width, kernel_size=3, stride=2, padding=4)
+            self.block1 = BottleNeck1d_3(in_channels=width, hidden_channels=width//2,
+                                         out_channels=width * 2, stride=2, kernel_size=3, group_num=width//4)
+            self.block2 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width//2,
+                                         out_channels=width * 2, stride=2, kernel_size=3, group_num=width//4)
+            self.block3 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2)
+            self.block4 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2)
+            self.block5 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2)
+            # 16 left
+            self.pooling = nn.AvgPool1d(kernel_size=16, stride=16)
+            self.fc1 = NPNLinear(width * 4, width * 4, dual_input=False, first_layer_assign=False)
+            self.nonlinear1 = NPNRelu()
+            # self.dropout1 = NPNDropout(self.fc_drop)
+            self.fc2 = NPNLinear(width * 4, 1)
+        elif self.type == 'combined_dis':
+            width = 16
+            self.conv0 = nn.Conv1d(1, width, kernel_size=3, stride=2, padding=4)
+            self.block1 = BottleNeck1d_3(in_channels=width, hidden_channels=width//2,
+                                         out_channels=width * 2, stride=2, kernel_size=3, group_num=width//4)
+            self.block2 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width//2,
+                                         out_channels=width * 2, stride=2, kernel_size=3, group_num=width//4)
+            self.block3 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2)
+            self.block4 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2)
+            self.block5 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2)
+            # 16 left
+            self.pooling = nn.AvgPool1d(kernel_size=16, stride=16)
+            self.fc1 = NPNLinear(width * 4 + 1, width * 4, dual_input=False, first_layer_assign=False)
+            self.nonlinear1 = NPNRelu()
+            # self.dropout1 = NPNDropout(self.fc_drop)
+            self.fc2 = NPNLinear(width * 4, 1)
 
     def forward(self, x):
         if self.type == 'mlp':
@@ -119,4 +175,49 @@ class Enc(nn.Module):
             x = x.squeeze(2)
             x = self.fc1(x)
             return x
-
+        elif self.type == 'cnn1':
+            x = x.unsqueeze(1)
+            x = self.conv0(x)
+            x = self.block0.forward(x)
+            x = self.block1.forward(x)
+            x = self.block2.forward(x)
+            x = self.block3.forward(x)
+            x = self.block4.forward(x)
+            x = self.block5.forward(x)
+            x = self.pooling(x)
+            x = x.squeeze(2)
+            x = self.fc1(x)
+            return x
+        elif self.type == 'combined':
+            x = x.unsqueeze(1)
+            x = self.conv0(x)
+            x = self.block1.forward(x)
+            x = self.block2.forward(x)
+            x = self.block3.forward(x)
+            x = self.block4.forward(x)
+            x = self.block5.forward(x)
+            x = self.pooling(x)
+            x = x.squeeze(2)
+            x = self.nonlinear1(self.fc1(x))
+            # x = self.dropout1(x)
+            x = self.fc2(x)
+            a_m, a_s = x
+            return a_m, a_s
+        elif self.type == 'combined_dis':
+            wave, dis = x
+            x = wave.unsqueeze(1)
+            dis = dis.unsqueeze(1)
+            x = self.conv0(x)
+            x = self.block1.forward(x)
+            x = self.block2.forward(x)
+            x = self.block3.forward(x)
+            x = self.block4.forward(x)
+            x = self.block5.forward(x)
+            x = self.pooling(x)
+            x = x.squeeze(2)
+            x = torch.cat((dis, x), dim=1)
+            x = self.nonlinear1(self.fc1(x))
+            # x = self.dropout1(x)
+            x = self.fc2(x)
+            a_m, a_s = x
+            return a_m, a_s
