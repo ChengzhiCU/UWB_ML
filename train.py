@@ -5,7 +5,9 @@ from learning.datasets_config import get_random_filenames
 from learning.utils import *
 from learning.datasets import *
 from learning.loops import train_loop, val_loop
+from learning.vae_loop import vae_train_loop, vae_val_loop
 from learning.models import *
+import time
 
 import config
 import torch.optim as optim
@@ -16,12 +18,12 @@ import torch
 parser = argparse.ArgumentParser(description='RF-Sleep Training Script')
 parser.add_argument('--workers', '-j', default=1, type=int, help='number of data loading workers')
 parser.add_argument('--batch', type=int, default=64, help='input batch size')
-parser.add_argument('--epochs', default=200, type=int, help='number of epochs to run')
+parser.add_argument('--epochs', default=500, type=int, help='number of epochs to run')
 parser.add_argument('--seed', default=2000, type=int, help='manual seed')
 parser.add_argument('--ngpu', default=1, type=int, help='number of GPUs to use')
 parser.add_argument('--cnn_width', default=16, type=int, help='number of channels for first layer cnn')
 parser.add_argument('--checkpoint', type=str, help='location of the checkpoint to load')
-parser.add_argument('--enc_type', default='combined_dis', type=str, help='type of models')
+parser.add_argument('--enc_type', default='vae', type=str, help='type of models')
 parser.add_argument('--output', default=time.strftime('%m-%d-%H-%M'),
                     type=str, help='folder to output model checkpoints')
 parser.add_argument('--print-freq', default=20, type=int, help='print frequency')
@@ -30,6 +32,8 @@ parser.add_argument('--evaluate', action='store_true', help='evaluate model on v
 parser.add_argument('--train-epoch', default=1, type=int, help='begining epoch No., just for saving model')
 parser.add_argument('--lr', default=5e-3, type=float, help='learning rate')
 parser.add_argument('--lambda_', default=0.3, type=float, help='ratio of mse and variance')
+parser.add_argument('--lambda_vae', default=0.5, type=float, help='ratio of npn and vae loss')
+parser.add_argument('--add_noise', default=0.1, type=float, help='std of noise')
 
 parser.set_defaults(augment=True)
 args = parser.parse_args()
@@ -62,6 +66,7 @@ print("Summary of Arguments:")
 for key, val in vars(args).items():
     print("{:10} {}".format(key, val))
 
+start_time = time.time()
 # train_filenames, val_filenames = get_random_filenames(args)
 train_dataset = UWBDataset(
     labeled_path=os.path.join(config.PAESED_FILES, 'all_38.npy'),
@@ -91,12 +96,19 @@ val_dataloader = data.DataLoader(
     num_workers=1,
     pin_memory=False
 )
+if 'vae' in args.enc_type:
+    print('initialize vae')
+    enc = nn.DataParallel(VaeEnc(args)).cuda()
+    dec = nn.DataParallel(VaeDec(args)).cuda()
+    model_names = ['enc', 'dec']
+    models = [enc, dec]
+    opt_non_D = optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=args.lr)
+else:
+    enc = nn.DataParallel(Enc(args)).cuda()
+    model_names = ['enc']
+    models = [enc]
+    opt_non_D = optim.Adam(enc.parameters(), lr=args.lr)
 
-enc = nn.DataParallel(Enc(args)).cuda()
-model_names = ['enc']
-models = [enc]
-
-opt_non_D = optim.Adam(enc.parameters(), lr=args.lr)
 optimizers = [opt_non_D]
 
 lr_scheduler_non_D = lr_scheduler.ExponentialLR(optimizer=opt_non_D, gamma=0.5 ** (1/100))
@@ -124,17 +136,33 @@ best_epoch = 0
 fp = open(os.path.join(args.output, 'log.txt'), 'a')
 args.fp = fp
 for epoch in range(args.epochs):
-
     print("")
-    train_loss_ave = train_loop(models, train_dataloader, optimizers, lr_schedulers,
-                                        epoch, args)
-    temp_metric = val_loop(models, val_dataloader, epoch, args)
+    if args.enc_type == 'vae':
+        train_start_time = time.time()
+        train_loss_ave = vae_train_loop(models, train_dataloader, optimizers, lr_schedulers,
+                                    epoch, args)
+        train_time_cost = time.time() - train_start_time
+        infer_start_time = time.time()
+        temp_metric = vae_val_loop(models, val_dataloader, epoch, args)
+        infer_time_cost = time.time() - infer_start_time
+    else:
+        train_start_time = time.time()
+        train_loss_ave = train_loop(models, train_dataloader, optimizers, lr_schedulers,
+                                            epoch, args)
+        train_time_cost = time.time() - train_start_time
+        infer_start_time = time.time()
+        temp_metric = val_loop(models, val_dataloader, epoch, args)
+        infer_time_cost = time.time() - infer_start_time
+    print('train time = {}   infer time = {}'.format(train_time_cost, infer_time_cost))
+
     if temp_metric < metric:
         metric = temp_metric
         best_epoch = epoch
         save_model(model_names, models, args.output, epoch, metric)  # save models to one zip file
 
-output_str = 'best test loss = {},  in meter average error = {}, epoch = {}\n'.format(metric, metric ** 0.5, best_epoch)
+total_time_cost = time.time() - start_time
+output_str = 'best test loss = {},  in meter average error = {}, epoch = {}\n time cost = {} \n train time = {} \n infer time = {}'\
+    .format(metric, metric ** 0.5, best_epoch, total_time_cost, train_time_cost, infer_time_cost)
 print(output_str)
 args.fp.write(output_str)
 args.fp.close()

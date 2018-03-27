@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from config import *
+from torch.autograd import Variable
 
 from learning.npn import NPNLinear
 from learning.npn import NPNRelu
@@ -10,6 +11,7 @@ from learning.npn import NPNSigmoid
 from learning.npn import NPNDropout
 from learning.npn import KL_loss
 from learning.npn import L2_loss
+from learning.deconv_block import *
 
 class BottleNeck1d_3(nn.Module):
     """
@@ -52,6 +54,7 @@ class BottleNeck1d_3(nn.Module):
 
         x = F.relu(x + y)
         return x
+
 
 class Enc(nn.Module):
     def __init__(self, args):
@@ -221,3 +224,115 @@ class Enc(nn.Module):
             x = self.fc2(x)
             a_m, a_s = x
             return a_m, a_s
+
+
+class VaeEnc(nn.Module):
+    def __init__(self, args):
+        super(VaeEnc, self).__init__()
+        self.type = args.enc_type
+        if self.type == 'vae':
+            self.width = 64
+            width = self.width
+            kernel_size = 5
+            self.conv0 = nn.Conv1d(1, width, kernel_size=kernel_size, stride=2, padding=4)
+            self.block1 = BottleNeck1d_3(in_channels=width, hidden_channels=width // 2,
+                                         out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 4)
+            self.block2 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width // 2,
+                                         out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 4)
+            self.block3 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            self.block4 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            self.block5 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            # 16 left
+            self.pooling = nn.AvgPool1d(kernel_size=4, stride=4)
+
+            self.fc1 = NPNLinear(width * 2 * 4 + 1, width * 2)
+            self.nonlinear1 = NPNRelu()
+            # self.dropout1 = NPNDropout(self.fc_drop)
+            self.fc2 = NPNLinear(width * 2, 1)
+
+    def forward(self, x):
+        if self.type == 'vae':
+            wave, dis = x
+            x = wave.unsqueeze(1)
+            dis = dis.unsqueeze(1)
+            x = self.conv0(x)
+            x = self.block1.forward(x)
+            x = self.block2.forward(x)
+            x = self.block3.forward(x)
+            x = self.block4.forward(x)
+            x = self.block5.forward(x)
+            x = self.pooling(x)
+
+            mean = x[:, :self.width * 2, :]
+            mean = mean.contiguous()
+            stddev = F.softplus(x[:, self.width * 2:, :])
+            stddev = stddev.contiguous()
+            mean = mean.view(mean.size(0), mean.size(1) * mean.size(2))
+            stddev = stddev.view(stddev.size(0), stddev.size(1) * stddev.size(2))
+
+            normal_array = Variable(torch.normal(means=torch.zeros(mean.size()), std=1.0).cuda())
+            z = mean + stddev * normal_array
+
+            # x = torch.cat((dis, z), dim=1)  # this is one solution
+            x_m = torch.cat((dis, mean), dim=1)
+            x_s = torch.cat((Variable(torch.zeros((x_m.size(0), 1)).cuda()), stddev), dim=1)
+            x = x_m, x_s
+
+            x = self.nonlinear1(self.fc1(x))
+            # x = self.dropout1(x)
+            x = self.fc2(x)
+            a_m, a_s = x
+            return a_m, a_s, mean, stddev, z
+
+
+class VaeDec(nn.Module):
+    def __init__(self, args):
+        super(VaeDec, self).__init__()
+        self.type = args.enc_type
+        if self.type == 'vae':
+            width = 32
+            kernel_size = 5
+            self.upsample_layer = nn.Upsample(scale_factor=4, mode='nearest')
+            self.de_block1 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
+                                               out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            # self.de_block1_1 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
+            #                                      out_channels=width * 4, stride=2, kernel_size=3, group_num=width // 2)
+            # self.de_block1_2 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
+            #                                      out_channels=width * 4, stride=2, kernel_size=3, group_num=width // 2)
+            # self.de_block1_3 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
+            #                                      out_channels=width * 4, stride=2, kernel_size=3, group_num=width // 2)
+            # self.de_block1_4 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
+            #                                      out_channels=width * 4, stride=2, kernel_size=3, group_num=width // 2)
+            self.de_block2 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
+                                               out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            self.de_block3 = DeBottleNeck1d_3G(in_channels=width * 2, hidden_channels=width // 2,
+                                               out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 4)
+            self.de_block4 = DeBottleNeck1d_3G(in_channels=width * 2, hidden_channels=width // 2,
+                                               out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 4)
+            self.de_block5 = DeBottleNeck1d_3G(in_channels=width * 2, hidden_channels=width // 2,
+                                               out_channels=width, stride=2, kernel_size=kernel_size, group_num=width // 4)
+            self.deconv = nn.ConvTranspose1d(width, 1, kernel_size=3, stride=2, padding=1, output_padding=1)
+
+    def forward(self, x):
+        if self.type == 'vae':
+            x = x.view(x.size(0), x.size(1) // 4, 4)
+            x = self.upsample_layer(x)
+            # x = torch.cat((x,x,x,x,x,x, x,x,x,x,x,x, x,x,x,x), dim=2)
+            # x = torch.cat((x, x, x, x), dim=2)
+            x = self.de_block1.forward(x)
+            # x = self.de_block1_1.forward(x)
+            # x = self.de_block1_2.forward(x)
+            # x = self.de_block1_3.forward(x)
+            # x = self.de_block1_4.forward(x)
+            x = self.de_block2.forward(x)
+            x = self.de_block3.forward(x) #96
+            x = self.de_block4.forward(x) # 192
+            x = self.de_block5.forward(x) # 384
+            x = self.deconv(x)
+            x = x.squeeze(1)
+            x = x[:, 4:-4]
+            return x
+
