@@ -5,8 +5,8 @@ from sklearn import svm
 
 # this is the average baseline for our model
 
-data = np.load(os.path.join(config.PAESED_FILES, 'all_38.npy'))[()]
-index = np.load(os.path.join(config.PAESED_FILES, 'train_ind.npy'))
+data = np.load(os.path.join(config.PAESED_FILES, 'all_128.npy'))[()]
+index = np.load(os.path.join(config.PAESED_FILES, 'train_ind_sep.npy'))
 train_num = index.shape[0]
 feature = data['extracted_features']
 label = data['label']
@@ -16,7 +16,7 @@ train_label = label[index, 0] - train_x[:, 0]
 print(feature.shape[0], train_num, train_x.shape, train_label.shape)
 
 ##
-index_test = np.load(os.path.join(config.PAESED_FILES, 'test_ind.npy'))
+index_test = np.load(os.path.join(config.PAESED_FILES, 'test_ind_sep.npy'))
 test_num = index_test.shape[0]
 test_x = feature[index_test]
 # test_label = np.expand_dims(test_label[index, 0] - test_x[:, 0], axis=1)

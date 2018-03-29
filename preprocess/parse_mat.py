@@ -2,6 +2,8 @@ import numpy as np
 from config import *
 import shutil
 import scipy.io
+from random import shuffle
+import random
 
 class ParseMAt:
     def __init__(self, overwrite):
@@ -41,6 +43,18 @@ class ParseMAt:
         filelist = os.listdir(self.input_path)
         L = len(filelist)
 
+        all_list = [i for i in range(len(filelist))]
+        # shuffled_list = shuffle(all_list)
+        # print('shuffled_list', shuffled_list)
+        # train_point_ind = shuffled_list[:int(len(filelist) * 0.8)]
+        # test_point_ind = shuffled_list[int(len(filelist) * 0.8):]
+        train_point_ind = random.sample(all_list, int(len(filelist) * 0.8))
+        print(train_point_ind)
+
+        train_data_ind = []
+        test_data_ind = []
+
+        num=0
         for i, each in enumerate(filelist):
             matdata = scipy.io.loadmat(os.path.join(self.input_path, each))
             matdata = matdata['data'][0]
@@ -49,6 +63,15 @@ class ParseMAt:
             extracted_feature = data_array[1]
             label = data_array[2]
             scene_index = np.ones_like(label, dtype=np.float32) * i
+
+            block_length = wave_data.shape[0]
+            num_list_block = [i for i in range(num, num+block_length)]
+            num += block_length
+            if i in train_point_ind:
+                train_data_ind = train_data_ind + num_list_block
+            else:
+                test_data_ind = test_data_ind + num_list_block
+
             data = {
                 'wave': wave_data,
                 'extracted_features': extracted_feature,
@@ -80,13 +103,14 @@ class ParseMAt:
         data_num = all_label.shape[0]
         # train_data_ind = [i for i in range(data_num) if i%5]
         # test_data_ind = [i for i in range(data_num) if  i%5==0]
-        train_data_ind = [i for i in range(data_num) if i < int(data_num * 0.8)]
-        test_data_ind = [i for i in range(data_num) if i >= int(data_num * 0.8)]
+
+
 
         # random
         # train_data_ind = np.random.choice(data_num, int(data_num * 0.8), replace=False)
         # or you can permutate and pick up the first 80% data
         # test_data_ind = [i for i in range(data_num) if not i%5]
+        print(test_data_ind[:1000])
         np.save(os.path.join(self.save_path, 'train_ind_sep'), train_data_ind)
         np.save(os.path.join(self.save_path, 'test_ind_sep'), test_data_ind)
 

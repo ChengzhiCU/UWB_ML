@@ -18,12 +18,12 @@ import torch
 parser = argparse.ArgumentParser(description='RF-Sleep Training Script')
 parser.add_argument('--workers', '-j', default=1, type=int, help='number of data loading workers')
 parser.add_argument('--batch', type=int, default=64, help='input batch size')
-parser.add_argument('--epochs', default=500, type=int, help='number of epochs to run')
+parser.add_argument('--epochs', default=200, type=int, help='number of epochs to run')
 parser.add_argument('--seed', default=2000, type=int, help='manual seed')
 parser.add_argument('--ngpu', default=1, type=int, help='number of GPUs to use')
 parser.add_argument('--cnn_width', default=16, type=int, help='number of channels for first layer cnn')
 parser.add_argument('--checkpoint', type=str, help='location of the checkpoint to load')
-parser.add_argument('--enc_type', default='vae', type=str, help='type of models')
+parser.add_argument('--enc_type', default='mlp', type=str, help='type of models')
 parser.add_argument('--output', default=time.strftime('%m-%d-%H-%M'),
                     type=str, help='folder to output model checkpoints')
 parser.add_argument('--print-freq', default=20, type=int, help='print frequency')
@@ -33,7 +33,7 @@ parser.add_argument('--train-epoch', default=1, type=int, help='begining epoch N
 parser.add_argument('--lr', default=5e-3, type=float, help='learning rate')
 parser.add_argument('--lambda_', default=0.3, type=float, help='ratio of mse and variance')
 parser.add_argument('--lambda_vae', default=0.5, type=float, help='ratio of npn and vae loss')
-parser.add_argument('--add_noise', default=0.1, type=float, help='std of noise')
+parser.add_argument('--add_noise', default=0.2, type=float, help='std of noise')
 
 parser.set_defaults(augment=True)
 args = parser.parse_args()
@@ -69,16 +69,16 @@ for key, val in vars(args).items():
 start_time = time.time()
 # train_filenames, val_filenames = get_random_filenames(args)
 train_dataset = UWBDataset(
-    labeled_path=os.path.join(config.PAESED_FILES, 'all_38.npy'),
+    labeled_path=os.path.join(config.PAESED_FILES, 'all_128.npy'),
     unlabelled_path=[],
-    train_index_file=os.path.join(config.PAESED_FILES, 'train_ind.npy')
+    train_index_file=os.path.join(config.PAESED_FILES, 'train_ind_sep.npy')
     # train_index_file=os.path.join(config.PAESED_FILES, 'train_ind_sep.npy')
 )
 
 val_dataset = UWBDataset(
-    labeled_path=os.path.join(config.PAESED_FILES, 'all_38.npy'),
+    labeled_path=os.path.join(config.PAESED_FILES, 'all_128.npy'),
     unlabelled_path=[],
-    train_index_file=os.path.join(config.PAESED_FILES, 'test_ind.npy')
+    train_index_file=os.path.join(config.PAESED_FILES, 'test_ind_sep.npy')
     # train_index_file=os.path.join(config.PAESED_FILES, 'test_ind_sep.npy')
 )
 

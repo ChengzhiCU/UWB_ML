@@ -246,9 +246,9 @@ class VaeEnc(nn.Module):
             self.block5 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
                                          out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
             # 16 left
-            self.pooling = nn.AvgPool1d(kernel_size=4, stride=4)
+            self.pooling = nn.AvgPool1d(kernel_size=2, stride=2)
 
-            self.fc1 = NPNLinear(width * 2 * 4 + 1, width * 2)
+            self.fc1 = NPNLinear(width * 2 * 8 + 1, width * 2)
             self.nonlinear1 = NPNRelu()
             # self.dropout1 = NPNDropout(self.fc_drop)
             self.fc2 = NPNLinear(width * 2, 1)
@@ -295,7 +295,7 @@ class VaeDec(nn.Module):
         if self.type == 'vae':
             width = 32
             kernel_size = 5
-            self.upsample_layer = nn.Upsample(scale_factor=4, mode='nearest')
+            self.upsample_layer = nn.Upsample(scale_factor=2, mode='nearest')
             self.de_block1 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
                                                out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
             # self.de_block1_1 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
@@ -318,7 +318,7 @@ class VaeDec(nn.Module):
 
     def forward(self, x):
         if self.type == 'vae':
-            x = x.view(x.size(0), x.size(1) // 4, 4)
+            x = x.view(x.size(0), x.size(1) // 8, 8)
             x = self.upsample_layer(x)
             # x = torch.cat((x,x,x,x,x,x, x,x,x,x,x,x, x,x,x,x), dim=2)
             # x = torch.cat((x, x, x, x), dim=2)
