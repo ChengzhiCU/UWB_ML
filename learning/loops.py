@@ -35,7 +35,7 @@ def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
         if 'npn' in args.enc_type:
             a_m, a_s = enc.forward(input)
             if not args.regression_delta:
-                a_m = a_m + input[:, 0]
+                a_m = a_m + input[:, 0].unsqueeze(1)
             # loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * torch.log(a_s))
             loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * a_s ** 2)
             loss = loss / a_m.size(1) / a_m.size(0)
@@ -50,7 +50,7 @@ def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
                 a_m, a_s = enc.forward(wave)
 
             if not args.regression_delta:
-                a_m = a_m + input[:, 0]
+                a_m = a_m + input[:, 0].unsqueeze(1)
             loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-8) + args.lambda_ * torch.log(a_s + 1e-8))
             loss = loss / a_m.size(1) / a_m.size(0)
 
@@ -59,12 +59,12 @@ def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
         elif 'cnn' in args.enc_type:
             predict = enc.forward(wave)
             if not args.regression_delta:
-                predict = predict + input[:, 0]
+                predict = predict + input[:, 0].unsqueeze(1)
             loss = full_mse_loss(predict, labels)
         else:
             predict = enc.forward(input)
             if not args.regression_delta:
-                predict = predict + input[:, 0]
+                predict = predict + input[:, 0].unsqueeze(1)
             loss = full_mse_loss(predict, labels)
 
         for model in models:
@@ -116,7 +116,7 @@ def val_loop(models, data_loader, epoch, args):
         if 'npn' in args.enc_type:
             a_m, a_s = enc.forward(input)
             if not args.regression_delta:
-                a_m = a_m + input[:, 0]
+                a_m = a_m + input[:, 0].unsqueeze(1)
             loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * torch.log(a_s))
             loss = loss / a_m.size(1) / a_m.size(0)
 
@@ -131,7 +131,7 @@ def val_loop(models, data_loader, epoch, args):
                 a_m, a_s = enc.forward(wave)
 
             if not args.regression_delta:
-                a_m = a_m + input[:, 0]
+                a_m = a_m + input[:, 0].unsqueeze(1)
             # loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * torch.log(a_s + 1e-10))
             loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * a_s**2)
             loss = loss / a_m.size(1) / a_m.size(0)
@@ -143,13 +143,13 @@ def val_loop(models, data_loader, epoch, args):
             predict = enc.forward(wave)
             loss = full_mse_loss(predict, labels)
             if not args.regression_delta:
-                predict = predict + input[:, 0]
+                predict = predict + input[:, 0].unsqueeze(1)
             abs_loss = torch.sum(torch.abs(predict - labels)) / labels.size(1) / labels.size(0)
         else:
             predict = enc.forward(input)
             loss = full_mse_loss(predict, labels)
             if not args.regression_delta:
-                predict = predict + input[:, 0]
+                predict = predict + input[:, 0].unsqueeze(1)
             abs_loss = torch.sum(torch.abs(predict - labels)) / labels.size(1) / labels.size(0)
 
         loss_all += loss.data[0]
