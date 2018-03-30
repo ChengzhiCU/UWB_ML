@@ -6,6 +6,7 @@ from learning.utils import *
 from learning.datasets import *
 from learning.loops import train_loop, val_loop
 from learning.vae_loop import vae_train_loop, vae_val_loop
+from learning.AE_loop import AE_train_loop, AE_val_loop
 from learning.models import *
 import time
 
@@ -18,12 +19,12 @@ import torch
 parser = argparse.ArgumentParser(description='RF-Sleep Training Script')
 parser.add_argument('--workers', '-j', default=1, type=int, help='number of data loading workers')
 parser.add_argument('--batch', type=int, default=64, help='input batch size')
-parser.add_argument('--epochs', default=50, type=int, help='number of epochs to run')
+parser.add_argument('--epochs', default=500, type=int, help='number of epochs to run')
 parser.add_argument('--seed', default=2000, type=int, help='manual seed')
 parser.add_argument('--ngpu', default=1, type=int, help='number of GPUs to use')
 parser.add_argument('--cnn_width', default=16, type=int, help='number of channels for first layer cnn')
 parser.add_argument('--checkpoint', type=str, help='location of the checkpoint to load')
-parser.add_argument('--enc_type', default='mlp', type=str, help='type of models')
+parser.add_argument('--enc_type', default='AE', type=str, help='type of models')
 parser.add_argument('--output', default=time.strftime('%m-%d-%H-%M'),
                     type=str, help='folder to output model checkpoints')
 parser.add_argument('--print-freq', default=20, type=int, help='print frequency')
@@ -106,6 +107,13 @@ if 'vae' in args.enc_type:
     model_names = ['enc', 'dec']
     models = [enc, dec]
     opt_non_D = optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=args.lr)
+elif 'AE' in args.enc_type:
+    print('initialize AE')
+    enc = nn.DataParallel(AEEnc(args)).cuda()
+    dec = nn.DataParallel(AEDec(args)).cuda()
+    model_names = ['enc', 'dec']
+    models = [enc, dec]
+    opt_non_D = optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=args.lr)
 else:
     enc = nn.DataParallel(Enc(args)).cuda()
     model_names = ['enc']
@@ -149,6 +157,14 @@ for epoch in range(args.epochs):
         train_time_cost = time.time() - train_start_time
         infer_start_time = time.time()
         rmse_metric, abs_metric = vae_val_loop(models, val_dataloader, epoch, args)
+        infer_time_cost = time.time() - infer_start_time
+    elif args.enc_type == 'AE':
+        train_start_time = time.time()
+        train_loss_ave = AE_train_loop(models, train_dataloader, optimizers, lr_schedulers,
+                                    epoch, args)
+        train_time_cost = time.time() - train_start_time
+        infer_start_time = time.time()
+        rmse_metric, abs_metric = AE_val_loop(models, val_dataloader, epoch, args)
         infer_time_cost = time.time() - infer_start_time
     else:
         train_start_time = time.time()

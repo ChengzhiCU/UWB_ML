@@ -326,13 +326,15 @@ class AEEnc(nn.Module):
             x = self.block3.forward(x)
             x = self.block4.forward(x)
             x = self.block5.forward(x)
-            x = self.pooling(x)
+            z = self.pooling(x)
 
-            x = self.nonlinear1(self.fc1(x))
+            zz = z.view(z.size(0), z.size(1) * z.size(2))
+            zz = torch.cat((dis, zz), dim=1)
+            x = self.nonlinear1(self.fc1(zz))
             # x = self.dropout1(x)
             x = self.fc2(x)
             a_m, a_s = x
-            return a_m, a_s
+            return a_m, a_s, z
 
 
 class VaeDec(nn.Module):
@@ -389,7 +391,7 @@ class AEDec(nn.Module):
         super(AEDec, self).__init__()
         self.type = args.enc_type
         if self.type == 'AE':
-            width = 32
+            width = 64
             kernel_size = 5
             self.upsample_layer = nn.Upsample(scale_factor=2, mode='nearest')
             self.de_block1 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
