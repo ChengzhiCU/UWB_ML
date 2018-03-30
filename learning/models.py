@@ -288,6 +288,53 @@ class VaeEnc(nn.Module):
             return a_m, a_s, mean, stddev, z
 
 
+class AEEnc(nn.Module):
+    def __init__(self, args):
+        super(AEEnc, self).__init__()
+        self.type = args.enc_type
+        if self.type == 'AE':
+            self.width = 64
+            width = self.width
+            kernel_size = 5
+            self.conv0 = nn.Conv1d(1, width, kernel_size=kernel_size, stride=2, padding=4)
+            self.block1 = BottleNeck1d_3(in_channels=width, hidden_channels=width // 2,
+                                         out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 4)
+            self.block2 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width // 2,
+                                         out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 4)
+            self.block3 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            self.block4 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            self.block5 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            # 16 left
+            self.pooling = nn.AvgPool1d(kernel_size=2, stride=2)
+
+            self.fc1 = NPNLinear(width * 4 * 8 + 1, width * 2, dual_input=False)
+            self.nonlinear1 = NPNRelu()
+            # self.dropout1 = NPNDropout(self.fc_drop)
+            self.fc2 = NPNLinear(width * 2, 1)
+
+    def forward(self, x):
+        if self.type == 'AE':
+            wave, dis = x
+            x = wave.unsqueeze(1)
+            dis = dis.unsqueeze(1)
+            x = self.conv0(x)
+            x = self.block1.forward(x)
+            x = self.block2.forward(x)
+            x = self.block3.forward(x)
+            x = self.block4.forward(x)
+            x = self.block5.forward(x)
+            x = self.pooling(x)
+
+            x = self.nonlinear1(self.fc1(x))
+            # x = self.dropout1(x)
+            x = self.fc2(x)
+            a_m, a_s = x
+            return a_m, a_s
+
+
 class VaeDec(nn.Module):
     def __init__(self, args):
         super(VaeDec, self).__init__()
@@ -336,3 +383,36 @@ class VaeDec(nn.Module):
             x = x[:, 4:-4]
             return x
 
+
+class AEDec(nn.Module):
+    def __init__(self, args):
+        super(AEDec, self).__init__()
+        self.type = args.enc_type
+        if self.type == 'AE':
+            width = 32
+            kernel_size = 5
+            self.upsample_layer = nn.Upsample(scale_factor=2, mode='nearest')
+            self.de_block1 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
+                                               out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            self.de_block2 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
+                                               out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            self.de_block3 = DeBottleNeck1d_3G(in_channels=width * 2, hidden_channels=width // 2,
+                                               out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 4)
+            self.de_block4 = DeBottleNeck1d_3G(in_channels=width * 2, hidden_channels=width // 2,
+                                               out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 4)
+            self.de_block5 = DeBottleNeck1d_3G(in_channels=width * 2, hidden_channels=width // 2,
+                                               out_channels=width, stride=2, kernel_size=kernel_size, group_num=width // 4)
+            self.deconv = nn.ConvTranspose1d(width, 1, kernel_size=3, stride=2, padding=1, output_padding=1)
+
+    def forward(self, x):
+        if self.type == 'AE':
+            x = self.upsample_layer(x)
+            x = self.de_block1.forward(x)
+            x = self.de_block2.forward(x)
+            x = self.de_block3.forward(x)  #96
+            x = self.de_block4.forward(x) # 192
+            x = self.de_block5.forward(x) # 384
+            x = self.deconv(x)
+            x = x.squeeze(1)
+            x = x[:, 4:-4]
+            return x

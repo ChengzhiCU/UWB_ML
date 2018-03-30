@@ -5,7 +5,7 @@ from sklearn import svm
 
 # this is the average baseline for our model
 
-data = np.load(os.path.join(config.PAESED_FILES, 'all_128.npy'))[()]
+data = np.load(os.path.join(config.PAESED_FILES, 'all_336.npy'))[()]
 index = np.load(os.path.join(config.PAESED_FILES, 'train_ind_sep.npy'))
 train_num = index.shape[0]
 feature = data['extracted_features']
@@ -29,5 +29,6 @@ clf = svm.SVR()
 clf.fit(train_x, train_label)
 predict_y = clf.predict(test_x)
 
-error = (np.sum((predict_y - test_label) ** 2) / test_label.shape[0]) ** 0.5
-print('dis error', error)
+rmse_error = (np.sum((predict_y - test_label) ** 2) / test_label.shape[0]) ** 0.5
+abs_error = (np.sum(np.abs(predict_y - test_label)) / test_label.shape[0])
+print('rmse dis error', rmse_error, 'abs meter error', abs_error)

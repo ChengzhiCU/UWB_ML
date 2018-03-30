@@ -21,6 +21,7 @@ def vae_train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
     num_per_epoch = len(data_loader)
     loss_all = 0
     loss_mse_all = 0
+    loss_abs_all = 0
     loss_var_all = 0
     loss_ELBO_all = 0
     loss_marginal_likelihood_all = 0
@@ -54,6 +55,7 @@ def vae_train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
         npn_loss = npn_loss / a_m.size(1) / a_m.size(0)
 
         mse_loss = torch.sum((a_m - labels) ** 2) / a_m.size(1) / a_m.size(0)
+        abs_loss = torch.sum(torch.abs(a_m - labels)) / a_m.size(1) / a_m.size(0)
         var_loss = torch.sum(a_s ** 2) / a_m.size(1) / a_m.size(0)
 
         loss = (1 - args.lambda_vae) * npn_loss + args.lambda_vae * ELBO
@@ -65,6 +67,7 @@ def vae_train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
 
         loss_all += loss.data[0]
         loss_mse_all += mse_loss.data[0]
+        loss_abs_all += abs_loss.data[0]
         loss_var_all += var_loss.data[0]
         loss_ELBO_all += ELBO.data[0]
         loss_marginal_likelihood_all += marginal_likelihood.data[0]
@@ -72,10 +75,10 @@ def vae_train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
 
         loss_cnt += 1.0
 
-        string_out = "{} epoch {}:                train loss = {} certainty = {}  mse_square_loss = {}\n" \
+        string_out = "{} epoch {}:                train loss = {} certainty = {}  mse_square_loss = {} average_meter_loss = {}\n" \
                      "ELBO = {}   marginal_likelihood = {}   KL_divergence = {}\n" \
             .format(args.enc_type, epoch, loss_all / loss_cnt, (loss_var_all / loss_cnt) ** 0.5,
-                    loss_mse_all / loss_cnt, loss_ELBO_all / loss_cnt, loss_marginal_likelihood_all / loss_cnt,
+                    loss_mse_all / loss_cnt, loss_abs_all / loss_cnt, loss_ELBO_all / loss_cnt, loss_marginal_likelihood_all / loss_cnt,
                     loss_KL_divergence_all / loss_cnt)
         print(string_out)
         args.fp.write(string_out)
@@ -92,6 +95,7 @@ def vae_val_loop(models, data_loader, epoch, args):
     num_per_epoch = len(data_loader)
     loss_all = 0
     loss_mse_all = 0
+    loss_abs_all = 0
     loss_var_all = 0
     loss_ELBO_all = 0
     loss_marginal_likelihood_all = 0
@@ -120,12 +124,14 @@ def vae_val_loop(models, data_loader, epoch, args):
         npn_loss = npn_loss / a_m.size(1) / a_m.size(0)
 
         mse_loss = torch.sum((a_m - labels) ** 2) / a_m.size(1) / a_m.size(0)
+        abs_loss = torch.sum(torch.abs(a_m - labels)) / a_m.size(1) / a_m.size(0)
         var_loss = torch.sum(a_s ** 2) / a_m.size(1) / a_m.size(0)
 
         loss = (1 - args.lambda_vae) * npn_loss + args.lambda_vae * ELBO
 
         loss_all += loss.data[0]
         loss_mse_all += mse_loss.data[0]
+        loss_abs_all += abs_loss.data[0]
         loss_var_all += var_loss.data[0]
         loss_ELBO_all += ELBO.data[0]
         loss_marginal_likelihood_all += marginal_likelihood.data[0]
@@ -133,13 +139,13 @@ def vae_val_loop(models, data_loader, epoch, args):
 
         loss_cnt += 1.0
 
-        string_out = "val loss = {} certainty = {}  mse_square_loss = {}\n" \
+        string_out = "val loss = {} certainty = {}  mse_square_loss = {}  average meter = {}\n" \
                      "ELBO = {}   marginal_likelihood = {}   KL_divergence = {}\n" \
             .format(loss_all / loss_cnt, (loss_var_all / loss_cnt) ** 0.5,
-                    loss_mse_all / loss_cnt, loss_ELBO_all / loss_cnt, loss_marginal_likelihood_all / loss_cnt,
+                    loss_mse_all / loss_cnt, loss_abs_all / loss_cnt, loss_ELBO_all / loss_cnt, loss_marginal_likelihood_all / loss_cnt,
                     loss_KL_divergence_all / loss_cnt)
         print(string_out)
         args.fp.write(string_out)
-        return loss_mse_all / loss_cnt
+        return loss_mse_all / loss_cnt, loss_abs_all / loss_cnt
 
 

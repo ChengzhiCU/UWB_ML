@@ -5,10 +5,11 @@ from config import *
 import os
 
 class UWBDataset(data.Dataset):
-    def __init__(self, labeled_path, unlabelled_path, train_index_file, is_norm=True):
+    def __init__(self, labeled_path, unlabelled_path, train_index_file, regression_delta=True, is_norm=True):
         self.labeled_path = labeled_path
         self.labeled_data = np.load(self.labeled_path)[()]
         self.is_norm = is_norm
+        self.regression_delta = regression_delta
 
         if len(unlabelled_path) > 0:
             self.unlabeled_path = unlabelled_path
@@ -34,7 +35,11 @@ class UWBDataset(data.Dataset):
         feature = self.labeled_data['extracted_features'][data_index]
         label = self.labeled_data['label'][data_index]
 
-        label = label - feature[0]
+        if self.regression_delta:
+            label = label - feature[0]
+        else:
+            pass
+
         subject = self.labeled_data['subject'][data_index]
 
         if self.is_norm:

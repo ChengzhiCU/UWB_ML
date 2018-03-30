@@ -18,7 +18,7 @@ import torch
 parser = argparse.ArgumentParser(description='RF-Sleep Training Script')
 parser.add_argument('--workers', '-j', default=1, type=int, help='number of data loading workers')
 parser.add_argument('--batch', type=int, default=64, help='input batch size')
-parser.add_argument('--epochs', default=200, type=int, help='number of epochs to run')
+parser.add_argument('--epochs', default=50, type=int, help='number of epochs to run')
 parser.add_argument('--seed', default=2000, type=int, help='manual seed')
 parser.add_argument('--ngpu', default=1, type=int, help='number of GPUs to use')
 parser.add_argument('--cnn_width', default=16, type=int, help='number of channels for first layer cnn')
@@ -34,6 +34,7 @@ parser.add_argument('--lr', default=5e-3, type=float, help='learning rate')
 parser.add_argument('--lambda_', default=0.3, type=float, help='ratio of mse and variance')
 parser.add_argument('--lambda_vae', default=0.5, type=float, help='ratio of npn and vae loss')
 parser.add_argument('--add_noise', default=0.2, type=float, help='std of noise')
+parser.add_argument('--regression_delta', default=False, type=bool, help='Regress error or not')
 
 parser.set_defaults(augment=True)
 args = parser.parse_args()
@@ -69,16 +70,18 @@ for key, val in vars(args).items():
 start_time = time.time()
 # train_filenames, val_filenames = get_random_filenames(args)
 train_dataset = UWBDataset(
-    labeled_path=os.path.join(config.PAESED_FILES, 'all_128.npy'),
+    labeled_path=os.path.join(config.PAESED_FILES, 'all_336.npy'),
     unlabelled_path=[],
-    train_index_file=os.path.join(config.PAESED_FILES, 'train_ind_sep.npy')
+    train_index_file=os.path.join(config.PAESED_FILES, 'train_ind_sep.npy'),
+    regression_delta=args.regression_delta
     # train_index_file=os.path.join(config.PAESED_FILES, 'train_ind_sep.npy')
 )
 
 val_dataset = UWBDataset(
-    labeled_path=os.path.join(config.PAESED_FILES, 'all_128.npy'),
+    labeled_path=os.path.join(config.PAESED_FILES, 'all_336.npy'),
     unlabelled_path=[],
-    train_index_file=os.path.join(config.PAESED_FILES, 'test_ind_sep.npy')
+    train_index_file=os.path.join(config.PAESED_FILES, 'test_ind_sep.npy'),
+    regression_delta=args.regression_delta
     # train_index_file=os.path.join(config.PAESED_FILES, 'test_ind_sep.npy')
 )
 
@@ -130,7 +133,9 @@ if args.evaluate:
         f.write('validation_log:\n{}'.format(validation_log))
     exit(0)
 
-metric = 99999999999
+best_meter_abs_metric = 99999999999
+best_rmse_metric = 99999999999
+best_rmse_epoch = 0
 best_epoch = 0
 
 fp = open(os.path.join(args.output, 'log.txt'), 'a')
@@ -143,7 +148,7 @@ for epoch in range(args.epochs):
                                     epoch, args)
         train_time_cost = time.time() - train_start_time
         infer_start_time = time.time()
-        temp_metric = vae_val_loop(models, val_dataloader, epoch, args)
+        rmse_metric, abs_metric = vae_val_loop(models, val_dataloader, epoch, args)
         infer_time_cost = time.time() - infer_start_time
     else:
         train_start_time = time.time()
@@ -151,18 +156,26 @@ for epoch in range(args.epochs):
                                             epoch, args)
         train_time_cost = time.time() - train_start_time
         infer_start_time = time.time()
-        temp_metric = val_loop(models, val_dataloader, epoch, args)
+        rmse_metric, abs_metric = val_loop(models, val_dataloader, epoch, args)
         infer_time_cost = time.time() - infer_start_time
     print('train time = {}   infer time = {}'.format(train_time_cost, infer_time_cost))
 
-    if temp_metric < metric:
-        metric = temp_metric
+    if abs_metric < best_meter_abs_metric:
+        best_meter_abs_metric = abs_metric
         best_epoch = epoch
-        save_model(model_names, models, args.output, epoch, metric)  # save models to one zip file
+        save_model(model_names, models, args.output, epoch, best_meter_abs_metric)  # save models to one zip file
+
+    if rmse_metric < best_rmse_metric:
+        best_rmse_metric = rmse_metric
+        best_rmse_epoch = epoch
 
 total_time_cost = time.time() - start_time
-output_str = 'best test loss = {},  in meter average error = {}, epoch = {}\n time cost = {} \n train time = {} \n infer time = {}'\
-    .format(metric, metric ** 0.5, best_epoch, total_time_cost, train_time_cost, infer_time_cost)
+output_str = 'best test rmse loss = {},  epoch = {}\n time cost = {} \n train time = {} \n infer time = {}'\
+    .format(best_rmse_metric ** 0.5, best_rmse_epoch, total_time_cost, train_time_cost, infer_time_cost)
 print(output_str)
 args.fp.write(output_str)
+output_str2 = ' in meter average error = {} epoch = {}\n'.format(best_meter_abs_metric, best_epoch)
+print(output_str2)
+args.fp.write(output_str2)
 args.fp.close()
+print('regress type is delta?', args.regression_delta)
