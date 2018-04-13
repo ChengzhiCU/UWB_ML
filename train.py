@@ -5,8 +5,11 @@ from learning.datasets_config import get_random_filenames
 from learning.utils import *
 from learning.datasets import *
 from learning.loops import train_loop, val_loop
+from learning.loops_npn import train_loop_npn, val_loop_npn
+from learning.loops_combined import train_loop_combined, val_loop_combined
 from learning.vae_loop import vae_train_loop, vae_val_loop
 from learning.AE_loop import AE_train_loop, AE_val_loop
+from learning.vae_mlp_loop import vaeMlp_train_loop, vaeMlp_val_loop
 from learning.models import *
 import time
 
@@ -19,22 +22,24 @@ import torch
 parser = argparse.ArgumentParser(description='RF-Sleep Training Script')
 parser.add_argument('--workers', '-j', default=1, type=int, help='number of data loading workers')
 parser.add_argument('--batch', type=int, default=64, help='input batch size')
-parser.add_argument('--epochs', default=500, type=int, help='number of epochs to run')
+parser.add_argument('--epochs', default=10, type=int, help='number of epochs to run')
 parser.add_argument('--seed', default=2000, type=int, help='manual seed')
 parser.add_argument('--ngpu', default=1, type=int, help='number of GPUs to use')
 parser.add_argument('--cnn_width', default=16, type=int, help='number of channels for first layer cnn')
 parser.add_argument('--checkpoint', type=str, help='location of the checkpoint to load')
-parser.add_argument('--enc_type', default='AE', type=str, help='type of models')
+parser.add_argument('--enc_type', default='vae', type=str, help='type of models')
+parser.add_argument('--data_filename', default='all_698.npy', type=str, help='type of models')
+parser.add_argument('--loss_type', default='L1', type=str, help='type of models')
 parser.add_argument('--output', default=time.strftime('%m-%d-%H-%M'),
                     type=str, help='folder to output model checkpoints')
 parser.add_argument('--print-freq', default=20, type=int, help='print frequency')
 parser.add_argument('--evaluate', action='store_true', help='evaluate model on validation set')
 
 parser.add_argument('--train-epoch', default=1, type=int, help='begining epoch No., just for saving model')
-parser.add_argument('--lr', default=5e-3, type=float, help='learning rate')
+parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
 parser.add_argument('--lambda_', default=0.3, type=float, help='ratio of mse and variance')
 parser.add_argument('--lambda_vae', default=0.5, type=float, help='ratio of npn and vae loss')
-parser.add_argument('--add_noise', default=0.2, type=float, help='std of noise')
+parser.add_argument('--add_noise', default=0, type=float, help='std of noise')
 parser.add_argument('--regression_delta', default=False, type=bool, help='Regress error or not')
 
 parser.set_defaults(augment=True)
@@ -70,20 +75,29 @@ for key, val in vars(args).items():
 
 start_time = time.time()
 # train_filenames, val_filenames = get_random_filenames(args)
+
+parsed_folder = config.PARSED_FILES_LOSNEW_NLOSOLD
+args.parsed_folder = parsed_folder
 train_dataset = UWBDataset(
-    labeled_path=os.path.join(config.PAESED_FILES, 'all_336.npy'),
+    labeled_path=os.path.join(parsed_folder, args.data_filename),
     unlabelled_path=[],
-    train_index_file=os.path.join(config.PAESED_FILES, 'train_ind_sep.npy'),
+    train_index_file=os.path.join(parsed_folder, 'train_tr_ind_sep.npy'),
     regression_delta=args.regression_delta
     # train_index_file=os.path.join(config.PAESED_FILES, 'train_ind_sep.npy')
 )
 
 val_dataset = UWBDataset(
-    labeled_path=os.path.join(config.PAESED_FILES, 'all_336.npy'),
+    labeled_path=os.path.join(parsed_folder, args.data_filename),
     unlabelled_path=[],
-    train_index_file=os.path.join(config.PAESED_FILES, 'test_ind_sep.npy'),
+    train_index_file=os.path.join(parsed_folder, 'train_val_ind_sep.npy'),
     regression_delta=args.regression_delta
-    # train_index_file=os.path.join(config.PAESED_FILES, 'test_ind_sep.npy')
+)
+
+test_dataset = UWBDataset(
+    labeled_path=os.path.join(parsed_folder, args.data_filename),
+    unlabelled_path=[],
+    train_index_file=os.path.join(parsed_folder, 'test_ind_sep.npy'),
+    regression_delta=args.regression_delta
 )
 
 train_dataloader = data.DataLoader(
@@ -96,21 +110,36 @@ train_dataloader = data.DataLoader(
 val_dataloader = data.DataLoader(
     dataset=val_dataset,
     batch_size=args.batch,
-    shuffle=True,
+    shuffle=False,
     num_workers=1,
     pin_memory=False
 )
-if 'vae' in args.enc_type:
+test_dataloader = data.DataLoader(
+    dataset=test_dataset,
+    batch_size=args.batch,
+    shuffle=False,
+    num_workers=1,
+    pin_memory=False
+)
+
+if 'vae' == args.enc_type:
     print('initialize vae')
     enc = nn.DataParallel(VaeEnc(args)).cuda()
     dec = nn.DataParallel(VaeDec(args)).cuda()
     model_names = ['enc', 'dec']
     models = [enc, dec]
     opt_non_D = optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=args.lr)
-elif 'AE' in args.enc_type:
+elif 'AE' == args.enc_type:
     print('initialize AE')
     enc = nn.DataParallel(AEEnc(args)).cuda()
     dec = nn.DataParallel(AEDec(args)).cuda()
+    model_names = ['enc', 'dec']
+    models = [enc, dec]
+    opt_non_D = optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=args.lr)
+elif 'vaemlp' == args.enc_type:
+    print('initialize VaeMlp')
+    enc = nn.DataParallel(VaeMlpEnc(args)).cuda()
+    dec = nn.DataParallel(VaeDec(args)).cuda()   # use the same as vae model is OK
     model_names = ['enc', 'dec']
     models = [enc, dec]
     opt_non_D = optim.Adam(list(enc.parameters()) + list(dec.parameters()), lr=args.lr)
@@ -122,7 +151,7 @@ else:
 
 optimizers = [opt_non_D]
 
-lr_scheduler_non_D = lr_scheduler.ExponentialLR(optimizer=opt_non_D, gamma=0.5 ** (1/100))
+lr_scheduler_non_D = lr_scheduler.ExponentialLR(optimizer=opt_non_D, gamma=0.5 ** (1/150))
 lr_schedulers = [lr_scheduler_non_D]
 
 # optionally load model from a checkpoint
@@ -141,8 +170,10 @@ if args.evaluate:
         f.write('validation_log:\n{}'.format(validation_log))
     exit(0)
 
-best_meter_abs_metric = 99999999999
-best_rmse_metric = 99999999999
+best_meter_abs_metric_val = 99999999999
+best_meter_abs_metric_test = 99999999999
+best_rmse_metric_val = 99999999999
+best_rmse_metric_test = 99999999999
 best_rmse_epoch = 0
 best_epoch = 0
 
@@ -166,6 +197,14 @@ for epoch in range(args.epochs):
         infer_start_time = time.time()
         rmse_metric, abs_metric = AE_val_loop(models, val_dataloader, epoch, args)
         infer_time_cost = time.time() - infer_start_time
+    elif args.enc_type == 'vaemlp':
+        train_start_time = time.time()
+        train_loss_ave = vaeMlp_train_loop(models, train_dataloader, optimizers, lr_schedulers,
+                                    epoch, args)
+        train_time_cost = time.time() - train_start_time
+        infer_start_time = time.time()
+        rmse_metric, abs_metric = vaeMlp_val_loop(models, val_dataloader, epoch, args)
+        infer_time_cost = time.time() - infer_start_time
     else:
         train_start_time = time.time()
         train_loss_ave = train_loop(models, train_dataloader, optimizers, lr_schedulers,
@@ -176,23 +215,51 @@ for epoch in range(args.epochs):
         infer_time_cost = time.time() - infer_start_time
     print('train time = {}   infer time = {}'.format(train_time_cost, infer_time_cost))
 
-    if abs_metric < best_meter_abs_metric:
-        best_meter_abs_metric = abs_metric
+    if abs_metric < best_meter_abs_metric_val:  # not finished...
+        best_meter_abs_metric_val = abs_metric
+        best_rmse_metric_val = rmse_metric
         best_epoch = epoch
-        save_model(model_names, models, args.output, epoch, best_meter_abs_metric)  # save models to one zip file
-
-    if rmse_metric < best_rmse_metric:
-        best_rmse_metric = rmse_metric
-        best_rmse_epoch = epoch
+        save_model(model_names, models, args.output, epoch, best_meter_abs_metric_val)  # save models to one zip file
+        if args.enc_type == 'vae':
+            best_rmse_metric_test, best_meter_abs_metric_test = vae_val_loop(models, test_dataloader, epoch,
+                                                                             args, saveResult=True)
+        elif args.enc_type == 'AE':
+            best_rmse_metric_test, best_meter_abs_metric_test = AE_val_loop(models, test_dataloader, epoch,
+                                                                            args, saveResult=True)
+        elif args.enc_type == 'vaemlp':
+            best_rmse_metric_test, best_meter_abs_metric_test = vaeMlp_val_loop(models, test_dataloader, epoch,
+                                                                                args, saveResult=True)
+        else:
+            best_rmse_metric_test, best_meter_abs_metric_test = val_loop(models, test_dataloader, epoch,
+                                                                         args, saveResult=True)
+        str_print = 'test    meter error = {}  rmse loss = {}\n'.format(best_meter_abs_metric_test,
+                                                                        best_rmse_metric_test)
+        print(str_print)
+        args.fp.write(str_print)
 
 total_time_cost = time.time() - start_time
-output_str = 'best test rmse loss = {},  epoch = {}\n time cost = {} \n train time = {} \n infer time = {}'\
-    .format(best_rmse_metric ** 0.5, best_rmse_epoch, total_time_cost, train_time_cost, infer_time_cost)
+output_str = 'best val rmse loss = {},  epoch = {}\n time cost = {} \n train time = {} \n infer time = {}'\
+    .format(best_rmse_metric_val ** 0.5, best_epoch, total_time_cost, train_time_cost, infer_time_cost)
 print(output_str)
 args.fp.write(output_str)
-output_str2 = ' in meter average error = {} epoch = {}\n'.format(best_meter_abs_metric, best_epoch)
+output_str2 = ' in meter average error = {}\n'.format(best_meter_abs_metric_val)
 print(output_str2)
 args.fp.write(output_str2)
+
+output_str3 = 'best test meter loss = {}, best rmse loss = {} '.format(best_meter_abs_metric_test, best_rmse_metric_test ** 0.5)
+print(output_str3)
+args.fp.write(output_str3)
 args.fp.close()
 print('regress type is delta?', args.regression_delta)
+# print arguments
+print("Summary of Arguments:")
+for key, val in vars(args).items():
+    print("{:10} {}".format(key, val))
 
+
+from visualization.utils import CDF_plot
+datasave = np.load('temp_' + args.output.split('/')[-1] + '.npy')[()]
+label = datasave['groundtruth']
+predict_y = datasave['predict_y']
+CDF_plot(np.abs(predict_y - label), 200, parsed_folder.split('/')[-1] + '_' + args.output.split('/')[-1]
+         + str(best_meter_abs_metric_test))

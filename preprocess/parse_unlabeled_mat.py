@@ -6,8 +6,8 @@ from random import shuffle
 import random
 
 
-class ParseMAt:
-    def __init__(self, overwrite, input_path=MatDataPath, save_path=PAESED_FILES):
+class ParseUnlabeledMAt:
+    def __init__(self, overwrite, input_path, save_path):
         self.overwrite = overwrite
         self.input_path = input_path
         self.save_path = save_path

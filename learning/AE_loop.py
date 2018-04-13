@@ -7,7 +7,7 @@ import torch
 import numpy as np
 import config
 
-def vae_train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
+def AE_train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
     for model in models:
         model.train()
         set_dropout_mode(model, True)
@@ -44,16 +44,13 @@ def vae_train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
         else:
             wave_in = wave
 
-        a_m, a_s, mu, sigma, z = enc.forward((wave_in, dis))
+        a_m, a_s, z = enc.forward((wave_in, dis))
         y = dec.forward(z)
 
         if not args.regression_delta:
             a_m = a_m + input[:, 0].unsqueeze(1)
 
         marginal_likelihood = torch.sum((y - wave) ** 2) / wave.size(0) / wave.size(1)
-        KL_divergence = - torch.mean(0.5 * torch.sum(1 + torch.log(1e-8 + sigma ** 2) - mu ** 2 - sigma ** 2))
-
-        ELBO = marginal_likelihood + KL_divergence
 
         npn_loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * torch.log(a_s))
         npn_loss = npn_loss / a_m.size(1) / a_m.size(0)
@@ -62,7 +59,7 @@ def vae_train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
         abs_loss = torch.sum(torch.abs(a_m - labels)) / a_m.size(1) / a_m.size(0)
         var_loss = torch.sum(a_s ** 2) / a_m.size(1) / a_m.size(0)
 
-        loss = (1 - args.lambda_vae) * npn_loss + args.lambda_vae * ELBO
+        loss = (1 - args.lambda_vae) * npn_loss + args.lambda_vae * marginal_likelihood
 
         for model in models:
             model.zero_grad()
@@ -73,9 +70,7 @@ def vae_train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
         loss_mse_all += mse_loss.data[0]
         loss_abs_all += abs_loss.data[0]
         loss_var_all += var_loss.data[0]
-        loss_ELBO_all += ELBO.data[0]
         loss_marginal_likelihood_all += marginal_likelihood.data[0]
-        loss_KL_divergence_all += KL_divergence.data[0]
 
         loss_cnt += 1.0
 
@@ -89,7 +84,7 @@ def vae_train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
     return loss_mse_all / loss_cnt
 
 
-def vae_val_loop(models, data_loader, epoch, args, saveResult=False):
+def AE_val_loop(models, data_loader, epoch, args, saveResult=True):
     for model in models:
         model.train()
         set_dropout_mode(model, True)
@@ -118,16 +113,15 @@ def vae_val_loop(models, data_loader, epoch, args, saveResult=False):
         wave = Variable(wave.cuda())
         dis = input[:, 0]
 
-        a_m, a_s, mu, sigma, z = enc.forward((wave, dis))
+        a_m, a_s, z = enc.forward((wave, dis))
         y = dec.forward(z)
 
         if not args.regression_delta:
             a_m = a_m + input[:, 0].unsqueeze(1)
 
         marginal_likelihood = torch.sum((y - wave) ** 2) / wave.size(0) / wave.size(1)
-        KL_divergence = - torch.mean(0.5 * torch.sum(1 + torch.log(1e-8 + sigma ** 2) - mu ** 2 - sigma ** 2))
 
-        ELBO = marginal_likelihood + KL_divergence
+        ELBO = marginal_likelihood
 
         npn_loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * torch.log(a_s))
         npn_loss = npn_loss / a_m.size(1) / a_m.size(0)
@@ -144,7 +138,6 @@ def vae_val_loop(models, data_loader, epoch, args, saveResult=False):
         loss_var_all += var_loss.data[0]
         loss_ELBO_all += ELBO.data[0]
         loss_marginal_likelihood_all += marginal_likelihood.data[0]
-        loss_KL_divergence_all += KL_divergence.data[0]
 
         loss_cnt += 1.0
 

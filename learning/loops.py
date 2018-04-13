@@ -4,6 +4,8 @@ from learning.utils import *
 from learning.log import *
 from torch.autograd import Variable
 import torch
+import numpy as np
+import config
 
 
 def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
@@ -33,7 +35,7 @@ def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
         wave = Variable(wave.cuda())
 
         if 'npn' in args.enc_type:
-            a_m, a_s = enc.forward(input)
+            a_m, a_s = enc.forward(input[:, :5])
             if not args.regression_delta:
                 a_m = a_m + input[:, 0].unsqueeze(1)
             # loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * torch.log(a_s))
@@ -63,6 +65,7 @@ def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
             loss = full_mse_loss(predict, labels)
         else:
             predict = enc.forward(input)
+
             if not args.regression_delta:
                 predict = predict + input[:, 0].unsqueeze(1)
             loss = full_mse_loss(predict, labels)
@@ -90,7 +93,7 @@ def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
         return loss_all/loss_cnt
 
 
-def val_loop(models, data_loader, epoch, args):
+def val_loop(models, data_loader, epoch, args, saveResult=True):
     for model in models:
         model.eval() ####depends
         set_dropout_mode(model, False)
@@ -102,6 +105,9 @@ def val_loop(models, data_loader, epoch, args):
     loss_cnt = 0
     loss_mse_all = 0
     loss_var_all = 0
+
+    predict_y = []
+    groundtruth = []
 
     for idx, icml_data in enumerate(data_loader, 1):
         if idx > num_per_epoch:
@@ -159,6 +165,30 @@ def val_loop(models, data_loader, epoch, args):
             loss_mse_all += mse_loss.data[0]
             loss_var_all += var_loss.data[0]
         loss_cnt += 1.0
+
+        if saveResult:
+            if idx == 0:
+                if 'npn' in args.enc_type or 'combined' in args.enc_type:
+                    predict_y = a_m.data[0]
+                else:
+                    predict_y = predict.data[0]
+
+                groundtruth = labels.data[0]
+            else:
+                if 'npn' in args.enc_type or 'combined' in args.enc_type:
+                    predict_y = np.concatenate((predict_y, a_m.data[0]), axis=0)
+                else:
+                    predict_y = np.concatenate((predict_y, predict.data[0]), axis=0)
+                groundtruth = np.concatenate((groundtruth, labels.data[0]), axis=0)
+
+    if saveResult:
+        datasave = {}
+        datasave['groundtruth'] = groundtruth
+        datasave['predict_y'] = predict_y
+        np.save('temp_' + args.output.split('/')[-1], datasave)
+        import scipy.io
+        scipy.io.savemat(os.path.join(config.MAT_PLOT_PATH,
+                                      args.parsed_folder.split('/')[-1] + '_' + args.output.split('/')[-1]), datasave)
 
     if 'npn' in args.enc_type or 'combined' in args.enc_type:
         string_out = "val loss = {}  certainty_variance = {} mse_square_loss = {} meter error = {}\n".format(loss_all/loss_cnt,

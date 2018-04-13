@@ -72,7 +72,7 @@ class Enc(nn.Module):
             self.bn2 = nn.BatchNorm1d(width)
         elif self.type == 'npn':
             width = 128
-            self.fc1 = NPNLinear(INPUT_DIM, width, dual_input=False, first_layer_assign=True)
+            self.fc1 = NPNLinear(INPUT_DIM-2, width, dual_input=False, first_layer_assign=True)
             self.nonlinear1 = NPNRelu()
             # self.dropout1 = NPNDropout(self.fc_drop)
             self.fc2 = NPNLinear(width, 1)
@@ -341,7 +341,7 @@ class VaeDec(nn.Module):
     def __init__(self, args):
         super(VaeDec, self).__init__()
         self.type = args.enc_type
-        if self.type == 'vae':
+        if self.type == 'vae' or self.type == 'vaemlp':
             width = 32
             kernel_size = 5
             self.upsample_layer = nn.Upsample(scale_factor=2, mode='nearest')
@@ -366,7 +366,7 @@ class VaeDec(nn.Module):
             self.deconv = nn.ConvTranspose1d(width, 1, kernel_size=3, stride=2, padding=1, output_padding=1)
 
     def forward(self, x):
-        if self.type == 'vae':
+        if self.type == 'vae' or self.type == 'vaemlp':
             x = x.view(x.size(0), x.size(1) // 8, 8)
             x = self.upsample_layer(x)
             # x = torch.cat((x,x,x,x,x,x, x,x,x,x,x,x, x,x,x,x), dim=2)
@@ -418,3 +418,62 @@ class AEDec(nn.Module):
             x = x.squeeze(1)
             x = x[:, 4:-4]
             return x
+
+
+class VaeMlpEnc(nn.Module):
+    def __init__(self, args):
+        super(VaeMlpEnc, self).__init__()
+        self.type = args.enc_type
+        if self.type == 'vaemlp':
+            self.width = 64
+            width = self.width
+            kernel_size = 5
+            self.conv0 = nn.Conv1d(1, width, kernel_size=kernel_size, stride=2, padding=4)
+            self.block1 = BottleNeck1d_3(in_channels=width, hidden_channels=width // 2,
+                                         out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 4)
+            self.block2 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width // 2,
+                                         out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 4)
+            self.block3 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            self.block4 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            self.block5 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            # 16 left
+            self.pooling = nn.AvgPool1d(kernel_size=2, stride=2)
+
+            self.fc1 = nn.Linear(width * 2 * 8 + 1, width * 2)
+            self.fc2 = nn.Linear(width * 2, 1)
+
+    def forward(self, x):
+        if self.type == 'vaemlp':
+            wave, dis = x
+            x = wave.unsqueeze(1)
+            dis = dis.unsqueeze(1)
+            x = self.conv0(x)
+            x = self.block1.forward(x)
+            x = self.block2.forward(x)
+            x = self.block3.forward(x)
+            x = self.block4.forward(x)
+            x = self.block5.forward(x)
+            x = self.pooling(x)
+
+            mean = x[:, :self.width * 2, :]
+            mean = mean.contiguous()
+            stddev = F.softplus(x[:, self.width * 2:, :])
+            stddev = stddev.contiguous()
+            mean = mean.view(mean.size(0), mean.size(1) * mean.size(2))
+            stddev = stddev.view(stddev.size(0), stddev.size(1) * stddev.size(2))
+
+            normal_array = Variable(torch.normal(means=torch.zeros(mean.size()), std=1.0).cuda())
+            z = mean + stddev * normal_array
+
+            # x = torch.cat((dis, z), dim=1)  # this is one solution
+            x_m = torch.cat((dis, mean), dim=1)
+            # x_s = torch.cat((Variable(torch.zeros((x_m.size(0), 1)).cuda()), stddev), dim=1)
+            # x = x_m, x_s
+
+            x = F.relu(self.fc1(x_m))
+            # x = self.dropout1(x)
+            x = self.fc2(x)
+            return x, mean, stddev, z
