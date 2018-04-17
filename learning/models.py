@@ -230,7 +230,7 @@ class Enc(nn.Module):
             x = x.view(x_size[0], x_size[1] * x_size[2])
             x = torch.cat((dis, x), dim=1)
             x = self.nonlinear1(self.fc1(x))
-           # x = self.dropout1(x)
+            x = self.dropout1(x)
             x = self.fc2(x)
             a_m, a_s = x
             return a_m, a_s

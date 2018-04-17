@@ -27,10 +27,10 @@ parser.add_argument('--seed', default=2000, type=int, help='manual seed')
 parser.add_argument('--ngpu', default=1, type=int, help='number of GPUs to use')
 parser.add_argument('--cnn_width', default=16, type=int, help='number of channels for first layer cnn')
 parser.add_argument('--checkpoint', type=str, help='location of the checkpoint to load')
-parser.add_argument('--enc_type', default='mlp', type=str, help='type of models') #mlp, cnn, npn, combined_dis
-parser.add_argument('--data_filename', default='all_694.npy', type=str, help='type of models')
-#parser.add_argument('--data_filename', default='all_436.npy', type=str, help='type of models')
-#parser.add_argument('--data_filename', default='all_258.npy', type=str, help='type of models')
+parser.add_argument('--enc_type', default='combined_dis', type=str, help='type of models') #mlp, cnn, npn, combined_dis
+# parser.add_argument('--data_filename', default='all_698.npy', type=str, help='type of models')
+parser.add_argument('--data_filename', default='all_436.npy', type=str, help='type of models')
+# parser.add_argument('--data_filename', default='all_258.npy', type=str, help='type of models')
 parser.add_argument('--loss_type', default='L1', type=str, help='type of models')
 parser.add_argument('--output', default=time.strftime('%m-%d-%H-%M'),
                     type=str, help='folder to output model checkpoints')
@@ -78,7 +78,7 @@ for key, val in vars(args).items():
 start_time = time.time()
 # train_filenames, val_filenames = get_random_filenames(args)
 
-if args.data_filename == 'all_694.npy':
+if args.data_filename == 'all_698.npy':
     parsed_folder = config.PARSED_FILES_LOSNEW_NLOSOLD
 elif args.data_filename == 'all_436.npy':
     parsed_folder = config.PAESED_FILES_6F_NLOS

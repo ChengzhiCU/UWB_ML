@@ -1,0 +1,494 @@
+\documentclass{IEEEtran}
+\ifCLASSINFOpdf
+\else
+\fi
+
+\usepackage{acronym}  % make an acronym
+%\usepackage{amsmath,bm}
+%\usepackage{amssymb}
+%\usepackage{array}
+%\usepackage{algorithm}
+%\usepackage{algorithmic}
+%\usepackage{cleveref}
+%\usepackage{mathrsfs}
+%\usepackage{enumerate}
+%\usepackage{subfigure}
+%\usepackage{graphicx,graphics,epsfig,epstopdf,float}
+%\usepackage{mdwlist}
+%\usepackage{longtable}
+%\usepackage{multicol}
+%
+%\usepackage{booktabs}
+%\usepackage[font = scriptsize]{caption}
+%\usepackage{cite}
+%\usepackage{color}
+%\usepackage{colortbl}
+%
+%\usepackage[Symbol]{upgreek}
+%\usepackage{psfrag}
+\usepackage{bm}
+\usepackage{cite}
+\usepackage[usenames, dvipsnames]{color}
+\usepackage{psfrag}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{cleveref}
+\usepackage{latexsym}
+\usepackage{mathrsfs}
+\usepackage{epstopdf}
+\usepackage{algorithm}\makeatother
+\usepackage{mathtools}
+\usepackage{subfigure}
+\usepackage{algorithmic}
+\usepackage{relsize}
+
+
+%\floatname{algorithm}{Algorithm}
+%
+%\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+%
+%\renewcommand{\algorithmicensure}{\textbf{Output:}}
+
+\include{Wgroup-Teaching-Preamble}
+\newtheorem{remark}{Remark}
+\newtheorem{definition}{Definition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{proposition}{Proposition}
+
+
+\newcommand{\bmf}[1]{\mbox{\boldmath{$#1$}}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\makeatletter
+\newcommand{\Rmnum}[1]{\expandafter\@slowromancap\romannumeral #1@}
+
+\acrodef{bs_dpd}[BS-DPD]{beamspace \ac{dpd}}
+\acrodef{crlb}[CRLB]{Cram\'{e}r-Rao lower bound}
+\acrodef{fim}[FIM]{Fisher information matrix}
+\acrodef{toa}[TOA]{Time-of-arrival}
+\acrodef{tdoa}[TDOA]{different-time-of-arrival}
+\acrodef{aoa}[AOA]{angle-of-arrival}
+\acrodef{music}[MUSIC]{multiple signal classification}
+\acrodef{bbu}[BBU]{baseband units}
+\acrodef{rru}[RRU]{remote radio head}
+\acrodef{rmse}[RMSE]{root mean square error}
+\acrodef{pdf}[PDF]{possibility density function}
+\acrodef{snr}[SNR]{signal-to-noise-ratio}
+\acrodef{ula}[ULA]{uniform linear array}
+\acrodef{dft}[DFT]{discrete Fourier transform}
+\acrodef{uav}[UAV]{unmanned aerial vehicle}
+\acrodef{iov}[IoV]{internet of vehicles}
+\acrodef{sdp}[SDP]{semi-definite program}
+\acrodef{los}[LOS]{line-of-sight}
+
+\definecolor{blue}{rgb}{0.0, 0.0, 1.0}
+\title{ Spectrum Allocation for UAV-Aided Relative Localization of Ground Vehicles}
+
+\author{
+\vspace{0.2cm}
+\IEEEauthorblockN{
+Yuanpeng~Liu and
+Yuan~Shen}
+\IEEEauthorblockA{
+Tsinghua National Laboratory for Information Science and Technology\\
+Department of Electronic Engineering,
+Tsinghua University,
+Beijing 100084, China\\
+}
+%\IEEEauthorblockA{\IEEEauthorrefmark{2}
+%Tsinghua-Berkeley Shenzhen Institute,
+%Tsinghua University,
+Email: liu-yp15@mails.tsinghua.edu.cn,
+shenyuan\_ee@tsinghua.edu.cn
+%}
+}
+\renewcommand{\IEEEQED}{\IEEEQEDopen}
+\begin{document}
+
+
+\maketitle
+\begin{abstract}
+Ultra-Wide Band (UWB) is becoming a hot spot in indoor localization these years, because it is more accurate, more robust, and more power efficiency ranging compared with other ranging method. In this paper, we make the first attempt to use deep convolutional neural network (DCNN) to extract relevant features from Channel Impulse Response (CIR) of UWB devices, and adopt a kind of probabilistic neural network approach to mitigating the ranging error. Our method can output a ranging likelihood as a Gaussian Distribution, where the mean and variance value is calculated by our probabilistic neural network. The weights are trained using the KL divergence between the predicted distribution and ground-truth distribution as a loss function. The CIR and distance measurement are input into the training model, and the information in the CIR can be fully excavated with a deep learning approach, while the probabilistic neural network can make inference based on the extracted feature and the measured distance. Our proposed inference method is important for processing UWB data with big uncertainty. The experimental results demonstrate that the proposed method can reduce the ranging error effectively compared with other existing error mitigation method.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Ultra Wide Band (UWB), indoor localization, Bayesian learning, deep learning
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+Achieving very accurate ranging in harsh indoor environment can revolutionize our way of living , due to the high demand for such technology in fields like car tracking, smart homes, etc. However, many challenges such as the interference effect between different devices, the non-line-of-sight (NLOS) propagation, multipath effect prevent us from achieving such goal. Compared with other methods like WiFi or GPS, UWB is able to get better ranging results due to its superior obstacle-penetration capabilities in harsh environment and fine delay resolution. Besides the work which has been done on the hardware part, many efforts have been made on using signal processing or machine learning approach to mitigate the ranging error.
+
+Traditionally, several different methods are used for correcting the errors in indoor ranging. For non-line-of-sight mitigation, [] xiao et al use Support Vector Machine (SVM) and Gaussian Process Regression (GPR) to first indentify the line-of-sight or non-line-of-sight condition and then use received signal Strength to mitigate the estimation bias, however, the feature is too simple to be able to measure the complex real environment. [Marano et al] use a Channel Impulse Response (CIR) which contains more information, and then extract hand crafted features from the CIR signal and apply SVM machine learning method to mitigate the ranging error. However, the hand crafted features are heuristic and might not utilize all the useful information in the CIR signal. Recently, with the development of deep learning, automatic feature extraction have achieved many the state of the art performance in many machine learning applications, such as wireless sensing. However, these successful application requires a large amount of data to be collected to prevent overfitting of the model, because the CIR signal is highly dependent on the measurement environment and the signal itself is time varying.
+
+
+The machine learning models for indoor localization nowadays are restricted to hand crafted features [] and simple SVM [Moe Win] or Neural Network classifier []. Hand crafted features are not data driven which do not require the collection of a large amount of data, and human knowledge could be used to design such features. One the other hand, machine learning methods such as the Deep Learning rely more and more on the automatically feature extraction which requires little human knowledge. Just let the model find features from the data itself. However,  such learning method suffers from over-fitting when the data is insufficient and thus requires the collection of a large amount of labeled data, which is time consuming and impractical. Moreover, UWB CIR is with high uncertainty and is high dependent on the measurement conditions, which require more data to be collected to make a deep learning model generalize well.
+
+
+The main contributions of this paper are as follows:
+
+1.	We introduce an end-to-end learning model for mitigating the ranging error without the need to decide whether it is under line-of-sight or non-line-of-sight condition.
+
+2.	We make the first attempt to use deep convolutional neural network (DCNN) for CIR feature extraction, and adopt probabilistic Neural Network to predict a soft-ranging results by supervised end-to-end training.
+
+3.	We enhanced the DCNN feature extraction method with an semi-supervised Variational Auto-Encoding method.
+
+4.	We build a UWB indoor localization dataset and our proposed method achieves the state of the art results.
+
+\section{System Model}
+This section first introduces the system model and then derives the performance bound for the UAV-aided localization of vehicles in term of absolute and relative position errors.
+\subsection{Network Setting}
+The 3D network shown in Fig. ~1 consists of $N_{\text{a}}$ UAVs, $N_{\text{v}}$ vehicles and $N_{\text{b}}$ anchors. The anchors such as base stations are with known positions. Each UAV makes ranging measurements with anchors and other UAVs to provide localization services for the ground vehicles. The vehicles make ranging measurements with the UAVs to obtain their positions.\footnote{In this paper, the vehicles only make measurement with the UAVs. But they can also use anchor information in practice, such as GPS. } The object of this paper is to achieve the best localization performance of the vehicles given limited resources of the UAVs.
+
+The set of vehicles, UAVs and anchors are defined as $\mathcal{N}_{\text{v}}=\{1,2,\dots,N_{\text{v}}\}$, $\mathcal{N}_{\text{a}}=\{N_{\text{v}}+1,N_{\text{v}}+2,\dots,N_{\text{v}}+N_{\text{a}}\}$, and $\mathcal{N}_{\text{b}}=\{N_{\text{a}}+N_{\text{v}}+1,N_{\text{a}}+N_{\text{v}}+2,\dots,N_{\text{a}}+N_{\text{v}}+N_{\text{b}}\}$. The combined set is denoted by $\mathcal{N}_{\text{T}}=\mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}\cup\mathcal{N}_{\text{b}}$.
+
+The absolute position of node $k$ is $\mathbf{p}_k=[x_k,y_k,z_k]^{\text{T}}\in \mathbb{R}^3$. The position parameter vector combining the vehicles and UAVs  is denoted by $\mathbf{p}=[\mathbf{p}_1^{\text{T}}\quad \mathbf{p}_2^{\text{T}}\quad \dots \quad \mathbf{p}_{N_{\text{a}}+N_{\text{v}}}^{\text{T}} ]^{\text{T}}\in \mathbb{R}^{3N_{\text{a}}+3N_{\text{v}}}$.
+
+The anchors are assumed to be synchronized and a clock offset $\delta_k$ exists between the anchors and the node $k\in \mathcal{N}_{\text{a}} \cup \mathcal{N}_{\text{v}}$.
+From node $j$ to $k$, the distance and the unit direction vector between them are defined as
+\begin{equation}
+\begin{aligned}
+d_{kj}&=||\mathbf{p}_k-\mathbf{p}_j|| \\
+\mathbf{u}_{kj}&=\frac{1}{d_{kj}}[x_k-x_j,y_k-y_j,z_k-z_j]^{\text{T}}.
+\end{aligned}
+\end{equation}
+The node $k$ receives the signal $\rv{r}_{kj}(t)$ from the node $j$,
+\begin{equation}
+\rv{r}_{kj}(t)=\alpha_{kj}s_{kj}(t-\tau_{kj})+\rv{n}_{kj}(t)
+\end{equation}
+where $s_{kj}(t)$ is a known waveform, $\alpha_{kj}$ and $\tau_{kj}$ mean the amplitude and transmit delay, respectively, and $\rv{n}_{kj}(t)$ represents Gaussian noise with zero mean and spectral density $N_0/2$.\footnote{The single-path model is used for simplicity. Multi-path model can be treated as the single-path model in theoretical analysis \cite{SheWymWin:J10}.}
+The transmit delay  $\tau_{kj}$ of the LOS link can be expressed as
+\begin{equation}\label{eq38}
+\tau_{kj}=\frac{d_{kj}}{c}+\delta_k-\delta_j
+\end{equation}
+where $c$ is the signal transportation velocity.
+The unknown parameters of the UAVs and vehicles are defined as $\boldsymbol{\theta}=[\mathbf{p}^{\text{T}},\mathbf{b}^{\text{T}},\boldsymbol{\alpha}^{\text{T}}]^{\text{T}}$, where $\mathbf{b}=[b_1,b_2,\dots,b_{N_{\text{a}}+N_{\text{v}}}]^{\text{T}}$ in which $b_k=c\delta_k$ represents the distance offset corresponding to the clock offset $\delta_k$, and $\boldsymbol{\alpha}$ denotes the amplitudes of all the links.
+
+\subsection{Absolute Localization}
+We first obtain the equivalent Fisher information matrix (EFIM) of all the unknown parameters $\boldsymbol{\theta}$. Then the EFIM of the position and clock parameters $\boldsymbol{\theta}_1=[\mathbf{p}^{\text{T}},\mathbf{b}^{\text{T}}]^{\text{T}}$ is derived from Schur-complement.
+
+Following the steps in  \cite{SheWymWin:J10}, the EFIM of the position and clock offset parameters $\boldsymbol{\theta}_1$ can be determined as
+\begin{equation}\label{eq88}
+\mathbf{J}_{\text{e}}(\boldsymbol{\theta}_1)=
+\begin{bmatrix}
+  \mathbf{A}&\mathbf{B}\\
+  \mathbf{B}^{\text{T}}&\mathbf{D}
+\end{bmatrix}
+\end{equation}
+where
+\begin{equation}\label{eq4}
+\begin{aligned}
+\mathbf{A}=&\sum_{k\in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}} \sum_{j \in\mathcal{N}_{\text{T}}\backslash \{k\}} \mathbf{E}_{kk}\otimes \mathbf{C}_{kj}\\
+&- \sum_{k\in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}} \sum_{j \in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}\backslash \{k\}} \mathbf{E}_{kj}\otimes \mathbf{C}_{kj}\\
+%&\mathbf{B}=\sum_{k\in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}} \sum_{j \in\mathcal{N}_{\text{T}}\backslash \{k\}} \mathbf{E}_{kk}\otimes \mathbf{H}_{kj}\\
+%&- \sum_{k\in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}} \sum_{j \in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}\backslash \{k\}} \mathbf{E}_{kj}\otimes \mathbf{H}_{kj}\\
+%&\mathbf{D}=\sum_{k\in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}} \sum_{j \in\mathcal{N}_{\text{T}}\backslash \{k\}} \mathbf{E}_{kk}\otimes g_{kj}\\
+%&- \sum_{k\in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}} \sum_{j \in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}\backslash \{k\}} \mathbf{E}_{kj}\otimes g_{kj}\\
+\end{aligned}
+\end{equation}
+$\mathbf{B}$ and $\mathbf{D}$ has the same structure as $\mathbf{A}$ by replacing $\mathbf{C}_{kj}$ with $\mathbf{H}_{kj}$ and $g_{kj}$, respectively,
+%where $\mathbf{A}$, $\mathbf{B}$ and $\mathbf{D}$ are given in \eqref{eq4},
+$\mathbf{E}_{kj}$ is a $N_{\text{a}}+N_{\text{v}}$ dimensional square matrix with all zeros except a 1 on the $k$th row and $j$th column and $\otimes$ means kronecker product.
+The related variables and matrixes are listed as follows
+\begin{figure*}[!t]
+\normalsize
+%\begin{equation}\label{eq1}
+%\mathbf{A}=
+%\begin{bmatrix}
+%\sum_{j \in\mathcal{N}_{\text{T}}\backslash \{1\}} \mathbf{C}_{1,j} &-\mathbf{C}_{1,2} &\dots  &-\mathbf{C}_{1,N_{\text{a}}+N_{\text{v}}}\\
+%  -\mathbf{C}_{2,1}  &\sum_{j \in\mathcal{N}_{\text{T}}\backslash \{2\}} \mathbf{C}_{2,j}  &\dots   &-\mathbf{C}_{2,N_{\text{a}}+N_{\text{v}}} \\
+% \vdots  &\vdots &\ddots  &\vdots \\
+% -\mathbf{C}_{N_{\text{a}}+N_{\text{v}},1} &  -\mathbf{C}_{N_{\text{a}}+N_{\text{v}},2} &\dots &\sum_{j \in\mathcal{N}_{\text{T}}\backslash \{N_{\text{a}}+N_{\text{v}}\}} \mathbf{C}_{N_{\text{a}}+N_{\text{v}},j} \\
+%\end{bmatrix}
+%\end{equation}
+%\begin{equation}\label{eq2}
+%\mathbf{B}=	
+%\begin{bmatrix}
+%\sum_{j \in\mathcal{N}_{\text{T}}\backslash \{1\}} \mathbf{H}_{1,j} &-\mathbf{H}_{1,2} &\dots  &-\mathbf{H}_{1,N_{\text{a}}+N_{\text{v}}}\\
+%  -\mathbf{H}_{2,1}  &\sum_{j \in\mathcal{N}_{\text{T}}\backslash \{2\}} \mathbf{H}_{2,j}  &\dots   &-\mathbf{H}_{2,N_{\text{a}}+N_{\text{v}}} \\
+% \vdots  &\vdots &\ddots  &\vdots \\
+% -\mathbf{H}_{N_{\text{a}}+N_{\text{v}},1} &  -\mathbf{H}_{N_{\text{a}}+N_{\text{v}},2} &\dots &\sum_{j \in\mathcal{N}_{\text{T}}\backslash \{N_{\text{a}}+N_{\text{v}}\}} \mathbf{H}_{N_{\text{a}}+N_{\text{v}},j} \\
+%\end{bmatrix}
+%\end{equation}
+%\begin{equation}\label{eq3}
+%\mathbf{D}=
+%\begin{bmatrix}
+%  \sum_{j \in\mathcal{N}_{\text{T}}\backslash \{1\}} g_{1,j} &-g_{1,2} &\dots  &-g_{1,N_{\text{a}}+N_{\text{v}}}\\
+%  -g_{2,1}  &\sum_{j \in\mathcal{N}_{\text{T}}\backslash \{2\}} g_{2,j}  &\dots   &-g_{2,N_{\text{a}}+N_{\text{v}}} \\
+% \vdots  &\vdots &\ddots  &\vdots \\
+% -g_{N_{\text{a}}+N_{\text{v}},1} &  -g_{N_{\text{a}}+N_{\text{v}},2} &\dots &\sum_{j \in\mathcal{N}_{\text{T}}\backslash \{N_{\text{a}}+N_{\text{v}}\}} g_{N_{\text{a}}+N_{\text{v}},j} \\
+%\end{bmatrix}
+%\end{equation}
+
+%\begin{equation}\label{eq4}
+%\begin{aligned}
+%&\mathbf{A}=\sum_{k\in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}} \sum_{j \in\mathcal{N}_{\text{T}}\backslash \{k\}} \mathbf{E}_{kk}\otimes \mathbf{C}_{kj}- \sum_{k\in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}} \sum_{j \in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}\backslash \{k\}} \mathbf{E}_{kj}\otimes \mathbf{C}_{kj}\\
+%&\mathbf{B}=\sum_{k\in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}} \sum_{j \in\mathcal{N}_{\text{T}}\backslash \{k\}} \mathbf{E}_{kk}\otimes \mathbf{H}_{kj}- \sum_{k\in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}} \sum_{j \in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}\backslash \{k\}} \mathbf{E}_{kj}\otimes \mathbf{H}_{kj}\\
+%&\mathbf{D}=\sum_{k\in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}} \sum_{j \in\mathcal{N}_{\text{T}}\backslash \{k\}} \mathbf{E}_{kk}\otimes g_{kj}- \sum_{k\in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}} \sum_{j \in \mathcal{N}_{\text{a}}\cup\mathcal{N}_{\text{v}}\backslash \{k\}} \mathbf{E}_{kj}\otimes g_{kj}\\
+%\end{aligned}
+%\end{equation}
+\begin{equation}\label{eq13}
+\boldsymbol{\Gamma}_{\phi}=
+\begin{bmatrix}
+\cos{\phi_x}\cos{\phi_z}-\sin{\phi_x}\sin{\phi_y}\sin{\phi_z} & \cos{\phi_x}\sin{\phi_z}+ \sin{\phi_x}\cos{\phi_z} & -\sin{\phi_x}\cos{\phi_y}\\
+-\cos{\phi_y}\sin{\phi_z} & \cos{\phi_y}\cos{\phi_z} & \sin{\phi_y}\\
+\sin{\phi_x}\cos{\phi_z}+ \cos{\phi_x}\sin{\phi_y}\sin{\phi_z}& \sin{\phi_x}\sin{\phi_z}- \cos{\phi_x}\sin{\phi_y}\cos{\phi_z} & \cos{\phi_x}\cos{\phi_y}
+\end{bmatrix}
+\end{equation}
+\hrulefill
+\vspace*{4pt}
+\end{figure*}
+\begin{equation}
+\begin{aligned}
+&\mathbf{C}_{kj}=\mathbf{C}_{jk}^{\text{T}}=(\lambda_{kj}+\lambda_{jk})\mathbf{u}_{kj}\mathbf{u}_{jk}^{\text{T}} \\
+&\mathbf{H}_{kj}=(\lambda_{kj}-\lambda_{jk})\mathbf{u}_{kj}\\
+&g_{kj}=g_{jk}=\lambda_{kj}+\lambda_{jk}\\
+&\lambda_{kj}=\beta_{kj}\zeta_{kj}\\
+\end{aligned}
+\end{equation}
+where $\beta_{kj}$ is the normalized bandwidth of the transmission link from nodes $j$ to $k$, and $\zeta_{kj}$ is the ranging coefficient determined by the received waveforms.\footnote{It is worth noting that the parameter $\lambda_{kj}=0,j\in\mathcal{N}_{\text{v}},\forall k$ and $\lambda_{kj}=0,k\in\mathcal{N}_{\text{v}},j\in\mathcal{N}_{\text{b}}$ since these links do not exist in our system model.}
+
+Let $\mathbf{q}=[\mathbf{p}_1^{\text{T}}\quad \mathbf{p}_2^{\text{T}}\quad \dots \quad\mathbf{p}_{N_{\text{v}}}^{\text{T}} ]^{\text{T}}\in \mathbb{R}^{3N_{\text{v}}}$ denotes the position parameter vector of the vehicles. The EFIM $\mathbf{J}_{\text{e}}(\mathbf{q})$ of the vehicles can be obtained from $\mathbf{J}_{\text{e}}(\boldsymbol{\theta}_1)$ through Schur-complement with its inverse
+\begin{equation}
+\mathbf{J}_{\text{e}}^{-1}(\mathbf{q})=[\mathbf{J}_{\text{e}}^{-1}(\boldsymbol{\theta}_1)]_{1:3N_{\text{v}}, 1:3N_{\text{v}}}.
+\end{equation}
+The absolute SPEB of $\mathbf{q}$ defined in \cite{SheWymWin:J10} is
+\begin{equation}\label{eq09}
+\mathcal{P}(\mathbf{q})=\text{tr}\{\mathbf{J}_{\text{e}}^{-1}(\mathbf{q})\}.
+\end{equation}
+
+\subsection{Relative Localization}
+Relative geometry is used to show the relative relationship of the nodes which is often considered as the ``shape'' of the network.
+Thus, relative localization does not consider translation, rotation and in some cases scaling of the network.
+
+Given an estimation $\hat{\mathbf{q}}$ of $\mathbf{q}$ obtained from some estimator. The transformation of the vector $\hat{\mathbf{q}}$ is
+\begin{equation}
+T_{\boldsymbol{\alpha}}(\hat{\mathbf{q}})=
+\mathbf{R}_{\phi}\hat{\mathbf{q}}+[\mathbf{v}_x\; \mathbf{v}_y\; \mathbf{v}_z]* \mathbf{t}
+\end{equation}
+where
+\begin{equation}\label{eq11}
+\begin{aligned}
+&\mathbf{v}_x=[1,0,0,\dots,1,0,0]^{\text{T}}\in \mathbb{R}^{3N_{\text{v}}}\\
+&\mathbf{v}_y=[0,1,0,\dots,0,1,0]^{\text{T}}\in \mathbb{R}^{3N_{\text{v}}}\\
+&\mathbf{v}_z=[0,0,1,\dots,0,0,1]^{\text{T}}\in \mathbb{R}^{3N_{\text{v}}}\\
+\end{aligned}
+\end{equation}
+$\boldsymbol{\alpha}=[\phi_x,\phi_y,\phi_z,x,y,z]$ is the transformation parameter, $\mathbf{t}=[x\; y\; z]^{\text{T}}\in \mathbb{R}^{3}$ mean the translation in X, Y and Z axis, the diagonal rotation matrix $\mathbf{R}_{\phi}=\text{diag}\{\boldsymbol{\Gamma}_{\phi},\boldsymbol{\Gamma}_{\phi},\dots,\boldsymbol{\Gamma}_{\phi}\}\in \mathbb{R}^{3N_{\text{v}}\times 3N_{\text{v}}}$ consists of $N_{\text{v}}$ $3\times 3$ rotation matrixes $\boldsymbol{\Gamma}_{\phi}$ in \eqref{eq13} shown at the top of the next page. The matrix $\boldsymbol{\Gamma}_{\phi}$ means rotate $\phi_z$, $\phi_y$ and $\phi_x$ degrees about Z, Y and X axes in order. For relative geometry, our goal is to choose $\boldsymbol{\alpha}$  minimizing the differences between the transformed estimation $T_{\boldsymbol{\alpha}}(\hat{\mathbf{q}})$ and true positions $\mathbf{q}$
+\begin{equation}\label{9}
+\boldsymbol{\alpha}^*=\arg\min_{\boldsymbol{\alpha}}
+||\mathbf{q}-T_{\boldsymbol{\alpha}}
+(\hat{\mathbf{q}})||^2.
+\end{equation}
+
+The problem in \eqref{9} can be treated as a full Procrustes coordinates problem. It can be solved by least-square fitting and the optimal $\boldsymbol{\alpha}^*$ is listed in \cite{AruHuaBlo:J87}
+\begin{equation}
+\begin{aligned}
+\boldsymbol{\Gamma}_{\phi}^*&=\mathbf{V}\mathbf{U}^\text{T}\\
+\mathbf{t}^*&=(\mathbf{M}^\text{T}-\boldsymbol{\Gamma}_{\phi}^*\hat{\mathbf{M}}^\text{T})\mathbf{1}_{N_{\text{v}}}/N_{\text{v}}
+\end{aligned}
+\end{equation}
+where $\hat{\mathbf{M}}=[\hat{\mathbf{q}}_{1} , \; \hat{\mathbf{q}}_{2} , \; \dots, \;   \hat{\mathbf{q}}_{N_{\text{v}}}]^{\text{T}} \in \mathbb{R}^{N_{\text{v}}\times 3}$,
+$\mathbf{M}=[\mathbf{q}_{1}, \; \mathbf{q}_{2}, \; \dots, \;  \mathbf{q}_{N_{\text{v}}}]^{\text{T}}\in \mathbb{R}^{N_{\text{v}}\times 3}$ , $\mathbf{Q}=\mathbf{I}-N_{\text{v}}^{-1}\mathbf{1}_{N_{\text{v}}}\mathbf{1}_{N_{\text{v}}}^\text{T}$, $\mathbf{1}_{N_{\text{v}}}$
+means a column vector with $N_{\text{v}}$ ones, and $\hat{\mathbf{M}}^\text{T}\mathbf{Q}\mathbf{M}=\mathbf{U}\boldsymbol{\Lambda}\mathbf{V}^\text{T}$ is a form of singular value decomposition.
+%The rotation angles can be obtained from \eqref{eq13}
+%\begin{equation*}
+%\begin{aligned}
+%&\phi_x^*=\arctan{\big(-[\boldsymbol{\Gamma}_{\phi}^*]_{1,3}/[\boldsymbol{\Gamma}_{\phi}^*]_{3,3}\big)}\\
+%&\phi_y^*=\arcsin{\big([\boldsymbol{\Gamma}_{\phi}^*]_{2,3}\big)}\\
+%&\phi_z^*=\arctan{\big(-[\boldsymbol{\Gamma}_{\phi}^*]_{2,1}/[\boldsymbol{\Gamma}_{\phi}^*]_{2,2}\big).}\\
+%\end{aligned}
+%\end{equation*}
+The best-suited estimation of $\mathbf{q}$ through transformation is
+\begin{equation}
+\hat{\mathbf{q}}_{\text{r}}=T_{\boldsymbol{\alpha}^*}
+(\hat{\mathbf{q}}).
+\end{equation}
+The relative error of $\mathbf{q}$ can be defined as
+\begin{equation}
+\varepsilon_{\text{r}}=||\mathbf{q}-\hat{\mathbf{q}}_{\text{r}}||^2.
+\end{equation}
+
+Next, the relative SPEB is derived. For cooperative localization, the cooperation FIM $\mathbf{J}^{\text{C}}$ in \cite{SheWymWin:J10} formed only by the measurement links between the unknown nodes is part of the total FIM
+\begin{equation}
+\begin{aligned}
+&[\mathbf{J}^{\text{C}}]_{3k-1:3k,3n-1:3n}=\\
+&\quad \begin{cases}
+\sum_{j\in\mathcal{N}_{\text{v}}\backslash \{k\}}(\lambda_{kj}+\lambda_{jk})\mathbf{u}_{kj}\mathbf{u}_{kj}^{\text{T}},\quad&k=n\\
+-(\lambda_{kn}+\lambda_{nk})\mathbf{u}_{kn}\mathbf{u}_{kn}^{\text{T}},\quad&k\neq n.
+\end{cases}
+\end{aligned}
+\end{equation}
+
+Cooperation between nodes can only provide information for relative localization but no information for absolute localization, thus $\mathbf{J}^{\text{C}}$ is singular \cite{AshMos:J08}. Implement the following eigenvalue decomposition on $\mathbf{J}^{\text{C}}$
+\begin{equation}
+\mathbf{J}^{\text{C}}=[\mathbf{U} \; \widetilde{\mathbf{U}}]
+\Bigg[\begin{array}{cc}
+\boldsymbol{\Lambda}&\mathbf{0}\\
+\mathbf{0}&\mathbf{0}
+\end{array}\Bigg]
+[\mathbf{U}\; \widetilde{\mathbf{U}}]^{\text{T}}
+\end{equation}
+where the subspace $\mathbf{U}$ and $\widetilde{\mathbf{U}}$are formed by the eigenvectors with nonzero and zero eigenvalues, respectively. It can be seen that $\mathbf{J}^{\text{C}}$ can only provide information in the subspace $\mathcal{R}(\mathbf{U})$. The absolute SPEB in \eqref{eq09} is defined as the trace of the inverse of the total FIM.  The absolute SPEB can then be divided into two subspace parts:  $\mathcal{R}(\mathbf{U})^\perp$ and $\mathcal{R}(\mathbf{U})$ corresponding to the transformation and the relative part, respectively.
+Generally, $\widetilde{\mathbf{U}}$  has 6 degrees of freedom for the 3D case.\footnote{For the special two-node case, the subspace $\mathcal{R}(\mathbf{U})^\perp$ is of rank 5, choose any 5 vectors in $\mathcal{R}(\mathbf{U})^\perp$ can form the subspace $\mathcal{R}(\mathbf{U})^\perp$. }
+
+It can be proved that for the vehicles,
+$\mathcal{R}(\mathbf{U})^\perp=[\frac{\mathbf{v}_x}{||\mathbf{v}_x||}\quad \frac{\mathbf{v}_y}{||\mathbf{v}_y||}\quad \frac{\mathbf{v}_z}{||\mathbf{v}_z||} \quad  \frac{\mathbf{v}_\phi}{||\mathbf{v}_\phi||}\quad \frac{\mathbf{v}_\varphi}{||\mathbf{v}_\varphi||} \quad  \frac{\mathbf{v}_\gamma}{||\mathbf{v}_\gamma||}]$, where $\mathbf{v}_x$, $\mathbf{v}_y$ and $\mathbf{v}_z$ are given in \eqref{eq11} and
+%where $\mathbf{v}_x=[1,0,0,\dots,1,0,0]\in \mathbb{R}^{3N_{\text{a}}}$, $\mathbf{v}_y=[0,1,0,\dots,0,1,0]\in \mathbb{R}^{3N_{\text{a}}}$, $\mathbf{v}_z=[0,0,1,\dots,0,0,1]\in \mathbb{R}^{3N_{\text{a}}}$,
+%$\mathbf{v}_\phi=[-y_1, x_1,0,\dots, -y_{N_{\text{a}}}, x_{N_{\text{a}}},0]^{\text{T}}\in \mathbb{R}^{3N_{\text{a}}}$, $\mathbf{v}_\varphi=[0,-z_1, y_1,\dots,0,-z_{N_{\text{a}}}, y_{N_{\text{a}}}]^{\text{T}}\in \mathbb{R}^{3N_{\text{a}}}$, $\mathbf{v}_\gamma=[-z_1,0, x_1,\dots, -z_{N_{\text{a}}}, 0,x_{N_{\text{a}}}]^{\text{T}}\in \mathbb{R}^{3N_{\text{a}}}$.
+\begin{equation}\label{19}
+\begin{aligned}
+%&\mathbf{v}_x=[1,0,0,\dots,1,0,0]^{\text{T}}\in \mathbb{R}^{3N_{\text{v}}}\\
+%&\mathbf{v}_y=[0,1,0,\dots,0,1,0]^{\text{T}}\in \mathbb{R}^{3N_{\text{v}}}\\
+%&\mathbf{v}_z=[0,0,1,\dots,0,0,1]^{\text{T}}\in \mathbb{R}^{3N_{\text{v}}}\\
+&\mathbf{v}_\phi=[-y_1, x_1,0,\dots, -y_{N_{\text{v}}}, x_{N_{\text{v}}},0]^{\text{T}}\in \mathbb{R}^{3N_{\text{v}}}\\
+&\mathbf{v}_\varphi=[0,-z_1, y_1,\dots,0,-z_{N_{\text{v}}}, y_{N_{\text{v}}}]^{\text{T}}\in \mathbb{R}^{3N_{\text{v}}}\\
+&\mathbf{v}_\gamma=[-z_1,0, x_1,\dots, -z_{N_{\text{v}}}, 0,x_{N_{\text{v}}}]^{\text{T}}\in \mathbb{R}^{3N_{\text{v}}}.
+\end{aligned}
+\end{equation}
+
+\begin{definition}\label{pro_2}
+The relative and the transformation SPEB can be obtained by projecting $\mathbf{J}_{\text{e}}^{-1}(\mathbf{q})$ into subspace $\mathcal{R}(\mathbf{U})$ and $\mathcal{R}(\mathbf{U})^\perp$ \cite{AshMos:J08}, respectively, i.e.,
+\begin{equation}\label{eq20}
+\mathcal{P}_{\text{r}}(\mathbf{q})=\text{tr}\{\mathbf{U}^{\text{T}}\mathbf{J}_{\text{e}}^{-1}(\mathbf{q})\mathbf{U}\}
+\end{equation}
+\begin{equation}
+\mathcal{P}_{\text{t}}(\mathbf{q})=\text{tr}\{\widetilde{\mathbf{U}}^{\text{T}}\mathbf{J}_{\text{e}}^{-1}(\mathbf{q})\widetilde{\mathbf{U}}\}.
+\end{equation}
+\end{definition}\label{pro_2}
+It's straightforward to see
+\begin{equation}
+\mathcal{P}(\mathbf{q})=\mathcal{P}_{\text{r}}(\mathbf{q})+\mathcal{P}_{\text{t}}(\mathbf{q})
+\end{equation}
+%\begin{proof}
+%Omitted due to the space constraints. Please refer to \cite{AshMos:J08}.
+%\end{proof}
+
+\section{Spectrum Allocation Formulation}
+In this section, we formulate the spectrum allocation problems for relative localization.
+The goal of spectrum allocation is to achieve the minimum relative SPEB given limited total spectrum resources $\beta_{\text{tot}}$ for the UAVs.
+The original problem is given as
+\begin{eqnarray}
+\mathscr{P}: \quad \min_{\{\beta_{kj}\}} \quad &&\mathcal{P}_{\text{r}}(\mathbf{q}) \nonumber \\
+\text{s.t.}&&\sum \beta_{kj}\leq 1\\
+&&\beta_{kj}\geq 0. \nonumber
+\end{eqnarray}
+
+\begin{proposition}[Convexity]\label{p1}
+The relative performance metric $\mathcal{P}_{\text{r}}(\mathbf{q})$ is convex in $\beta_{kj}$.
+\end{proposition}
+
+\begin{proof}
+Consider the following matrix
+\begin{equation*}
+\mathbf{F}=\mathbf{G}^{\text{T}}\mathbf{J}_{\text{e}}(\boldsymbol{\theta}_1)\mathbf{G}, \quad
+\mathbf{G}=
+\begin{bmatrix}
+  [\mathbf{U} \; \widetilde{\mathbf{U}}]&\mathbf{0}\\
+  \mathbf{0}&\mathbf{I}\\
+\end{bmatrix}
+\end{equation*}
+\begin{equation*}
+\mathbf{F}^{-1}=\mathbf{G}^{\text{T}}\mathbf{J}_{\text{e}}^{-1}(\boldsymbol{\theta}_1)\mathbf{G}
+\end{equation*}
+It can be verified the following relationship between $\mathcal{P}_{\text{r}}(\mathbf{q})$ and $\mathbf{F}^{-1}$:
+\begin{equation*}
+\mathcal{P}_{\text{r}}(\mathbf{q})=\text{tr}\{\mathbf{U}^{\text{T}}\mathbf{J}_{\text{e}}^{-1}(\mathbf{q})\mathbf{U}\}=\text{tr}\{[\mathbf{F}^{-1}]_{1:3N_{\text{v}}-6,1:3N_{\text{v}}-6}\}
+\end{equation*}
+We know that for $\mathbf{F}\succeq 0$, $[\mathbf{F}^{-1}]_{m,m}$ is convex and non-increasing functions in $\mathbf{F}$ \cite{BoyVan:B04}. Moreover, $\mathbf{F}$ is a linear function of $\beta_{kj}$. From the convexity properties of composition theorem \cite{BoyVan:B04}, $\mathcal{P}_{\text{r}}(\mathbf{q})$ is a convex function of $\beta_{kj}$.
+\end{proof}
+
+\begin{remark}
+Proposition \ref{p1} implies that $\mathscr{P}$ is a convex program since the constraints are linear and the objective function is convex. Therefore, standard convex optimal methods can be employed to obtain the optimal solution of $\mathscr{P}$.
+\end{remark}
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.5\textwidth]{figabgain2.eps}
+    \caption{The averaged root \emph{absolute} SPEB with respect to the number of UAVs by the optimal and uniform allocation schemes. Two cases for different $N_{\text{b}}$ are considered: $N_{\text{b}}=4$ with no marker and $N_{\text{b}}=8$ with triangle marker.}\label{Fig2}
+\end{figure}
+
+Based on the properties of the relative SPEB, the problem $\mathscr{P}$ can be further converted to an SDP problem, which can be solved more efficiently by faster optimization solvers.
+\begin{proposition}\label{p2}
+The spectrum allocation problem can be converted to an equivalent SDP problem given below:
+\begin{eqnarray}\label{26}
+\mathscr{P}_{\text{SDP}}^{\text{I}}: \quad \min_{\{\beta_{kj}\},\mathbf{M}} \quad &&\text{tr}\{\mathbf{U}_1^{\text{T}}\mathbf{M}\mathbf{U}_1\} \nonumber\\
+\text{s.t.} \quad &&\begin{bmatrix}
+  \mathbf{M}&\mathbf{I}\\
+  \mathbf{I}&\mathbf{J}_{\text{e}}(\boldsymbol{\theta}_1) \\
+\end{bmatrix}\succeq 0 \label{22}\\
+&&\sum \beta_{kj}\leq 1 \nonumber\\
+&&\beta_{kj}\geq 0\nonumber
+\end{eqnarray}
+where $\mathbf{U}_1=[\mathbf{U}^{\text{T}}\; \mathbf{0}^{\text{T}}]^{\text{T}} \in \mathbb{R}^{4(N_{\text{v}}+N_{\text{a}})*(3N_{\text{v}}-6)}$.
+\end{proposition}
+
+\begin{proof} Recall \eqref{eq20}, and we have
+\begin{equation*}
+\mathcal{P}_{\text{r}}(\mathbf{q})=\text{tr}\{\mathbf{U}_1^{\text{T}}\mathbf{J}_{\text{e}}^{-1}(\boldsymbol{\theta}_1)\mathbf{U}_1 \}.
+\end{equation*}
+Replace $\mathbf{J}_{\text{e}}^{-1}(\boldsymbol{\theta}_1)$ with auxiliary matrix $\mathbf{M}$ constrained as
+\begin{equation}\label{25}
+\mathbf{M}\succeq \mathbf{J}_{\text{e}}^{-1}(\boldsymbol{\theta}_1).
+\end{equation}
+Since $\mathbf{J}_{\text{e}}^{-1}(\boldsymbol{\theta}_1) \succeq 0$, the above constraint \eqref{25} is equivalent to \eqref{22} using the Schur complement. Thus, we can obtain an equivalent SDP problem $\mathscr{P}_{\text{SDP}}^{\text{I}}$ from $\mathscr{P}$ by converting the objective function.
+\end{proof}
+
+Proposition \ref{p2} provides an general solution to the optimization problem in the form $\text{tr}\{\mathbf{U}_1^{\text{T}}\mathbf{J}_{\text{e}}^{-1}(\boldsymbol{\theta}_1)\mathbf{U}_1\}$. The above relative formulation can also be extended to the absolute case by setting $\mathbf{U}_1=[\mathbf{I}\;\mathbf{0}]^{\text{T}}\in \mathbb{R}^{4(N_{\text{v}}+N_{\text{a}})*3N_{\text{v}}}$.
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.5\textwidth]{figrelagain2.eps}
+    \caption{The averaged root \emph{relative} SPEB with respect to the number of UAVs by the optimal and uniform allocation schemes.}\label{Fig3}
+\end{figure}
+The spectrum allocation for the absolute localization is
+\begin{eqnarray}\label{27}
+\mathscr{P}_{\text{SDP}}^{\text{II}}: \quad \min_{\{\beta_{kj}\},\mathbf{M}} \quad &&\text{tr}\{[\mathbf{M}]_{1:3N_{\text{v}},1:3N_{\text{v}}}\} \nonumber\\
+\text{s.t.} \quad &&\begin{bmatrix}
+  \mathbf{M}&\mathbf{I}\\
+  \mathbf{I}&\mathbf{J}_{\text{e}}(\boldsymbol{\theta}_1) \\
+\end{bmatrix}\succeq 0 \label{24}\\
+&&\sum \beta_{kj}\leq 1 \nonumber\\
+&&\beta_{kj}\geq 0.\nonumber
+\end{eqnarray}
+
+\begin{remark}
+The above optimization formulation is based on the perfect knowledge of the network. The robust case considering the network uncertainty in \cite{DaiSheWin:J15} will be studied in the future work.
+\end{remark}
+
+\section{Numerical Results}
+In this section, we evaluate the performance of the proposed spectrum allocation method. The simulation scenario is a square region $[-1000\text{m},1000\text{m}]\times [-1000\text{m},1000\text{m}]$. Anchors such as base stations are placed at the four corners and edges of the square with their height uniformly in the interval $[2\text{m}, 6\text{m}]$. The UAVs are uniformly placed at the central $300\text{m}\times300\text{m}$ square with their height uniformly in the range $[100\text{m}, 150\text{m}]$.
+We use three nearby ground vehicles in a central square with length being 100 for Fig. \ref{Fig2} and Fig. \ref{Fig3}.
+
+The carrier frequency used in this paper is $f_c=2.4$ GHz. We use the free space pathloss model and -174 dBm/Hz noise power density.
+The transmit power of the anchors are 400mW, the transmit power of the UAVs is 400mW, the total spectrum of the UAVs  is $5N_{\text{t}}/3$ MHz. Given the number of the UAVs, we run Monte Carlo simulations to generate $10^4$ deployments of the UAVs and vehicles, and the averaged SPEB of the vehicles is used for comparison.
+
+We evaluate the absolute and relative SPEBs for two different spectrum allocation schemes: the optimal allocation via SDP and the uniform allocation that assigns the total spectrum equally over all the measurement links. The SDP problems in \eqref{26} and \eqref{27} are solved by CVX.
+\subsection{Absolute Localization Performance}
+First, the absolute SPEBs are shown in Fig. \ref{Fig2}. The absolute SPEBs decrease with the number of the UAVs. In our system, the vehicles only rely on the UAVs to locate themselves. More UAVs imply a larger probability for the vehicles to choose a better combination of the UAVs. With eight anchors, the absolute error is reduced about $25\%$ than with four anchors. We observe that the optimal allocation can reduce the SPEB by more than $40\%$ compared with the uniform allocation.
+\subsection{Relative Localization Performance}
+In Fig. \ref{Fig3}, we show the averaged relative SPEBs as a function of $N_{\text{a}}$. A decreasing trend is also observed. This is reasonable since the vehicles can choose ``better" neighbor UAVs when there are more UAVs. Moreover, the relative error can achieve 0.3 meter with six UAVs while the absolute error is up to 2 meters. In Fig. \ref{Fig4}, the relative SPEBs are shown with respect to the number of the vehicles. The optimal relative SPEB increases slowly with the number of the vehicles. With more vehicles, it is harder to make $\hat{\mathbf{q}}$ and $\mathbf{q}$ as close as possible and the averaged error of each vehicle will increase.
+
+It can be seen in both figures that the optimal allocation outperforms the uniform allocation by $40\%$ to $60\%$ in term of root SPEB which means it can save half of the spectrum, which is of great significance since the spectrum resource is limited.
+
+An interesting phenomenon is that the relative SPEBs increase with eight anchors for the uniform scheme. Through the optimal allocation for the relative localization, we find that most of the spectrum should be allocated to the UAV-vehicle links which is more important for relative localization. With more anchors in the uniform scheme, more spectrum are allocated to the UAV-anchor liks. However, these links are not very effective for relative localization of the vehicles resulting in worse performance.
+
+It is also observed that the optimal relative SPEBs improve little with eight anchors. The relative performance of the vehicles is mainly determined by the UAVs. More anchors can provide better absolute localization of the UAVs, but it do not have much impact on the relative relationship between the UAVs and the vehicles. Thus, more anchors cannot improve the relative performance of the vehicles much.\footnote{In our system, the vehicles only make measurements with the UAVs. If the vehicles use the anchors, more anchors will improve the relative performance.}
+
+\section{Conclusion}
+In this paper, we developed a spectrum allocation scheme for the UAV-aided relative localization of the vehicles. Both the absolute and relative SPEBs for the UAV-aided vehicles were derived. For the 3D cases, the nullspace of the 3D cooperative FIM is determined. We then formulate the optimization framework for the spectrum allocation problem in relative localization. The spectrum allocation problem can be converted to an SDP problem using properties of the relative SPEB. Numerical results show that the optimal spectrum allocation scheme for relative localization can outperform the uniform allocation scheme by $50\%$. The relative error can achieve 0.3 meter while the absolute error is up to 2 meters. The outcomes of the paper provide a potential solution to high accuracy relative localization as well as spectrum allocation strategies for UAV-aided vehicles. Robust cases considering position uncertainty will be studied in future.
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.5\textwidth]{figrelagaincar.eps}
+    \caption{The averaged root \emph{relative} SPEB with respect to the number of vehicles by the optimal and uniform allocation schemes when $N_{\text{a}}=10$.}\label{Fig4}
+\end{figure}
+\section*{Acknowledgment}
+This research was supported by the National Natural Science Foundation of China under Grant 61501279 and 91638204.
+
+
+
+
+\bibliographystyle{IEEEtran}
+\bibliography{IEEEabrv,SGroupDefinition,SGroup}
+
+
+\end{document}
