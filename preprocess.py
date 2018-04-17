@@ -31,22 +31,23 @@ import argparse
 # parse_mat_to_np.generate_data_all()
 
 
-# # parse new los data
+# parse new los data
+parse_mat_to_np = ParseMAt(
+    overwrite=False,
+    input_path=MatDataLOS6F_NEW_Path,
+    save_path=LOS_PAESED_FILES_NEW
+)
+parse_mat_to_np.generate_data_all()
+
+
+# # parse new los data old nlos data
 # parse_mat_to_np = ParseMAt(
 #     overwrite=False,
-#     input_path=MatDataLOS6F_NEW_Path,
-#     save_path=LOS_PAESED_FILES_NEW
+#     input_path=MatData_LOSNEW_NLOSOLD,
+#     save_path=PARSED_FILES_LOSNEW_NLOSOLD
 # )
 # parse_mat_to_np.generate_data_all()
 
-
-# parse new los data old nlos data
-parse_mat_to_np = ParseMAt(
-    overwrite=False,
-    input_path=MatData_LOSNEW_NLOSOLD,
-    save_path=PARSED_FILES_LOSNEW_NLOSOLD
-)
-parse_mat_to_np.generate_data_all()
 
 # parse_mat_to_np = LOSParseMAt(
 #     overwrite=False

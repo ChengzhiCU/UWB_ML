@@ -35,11 +35,12 @@ def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
         wave = Variable(wave.cuda())
 
         if 'npn' in args.enc_type:
-            a_m, a_s = enc.forward(input[:, :5])
+            a_m, a_s = enc.forward(input)
             if not args.regression_delta:
                 a_m = a_m + input[:, 0].unsqueeze(1)
-            # loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * torch.log(a_s))
-            loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * a_s ** 2)
+            loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * torch.log(a_s))
+            #loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * a_s ** 2)
+            #loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * a_s )
             loss = loss / a_m.size(1) / a_m.size(0)
 
             mse_loss = torch.sum((a_m - labels) ** 2) / a_m.size(1) / a_m.size(0)
@@ -54,6 +55,8 @@ def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
             if not args.regression_delta:
                 a_m = a_m + input[:, 0].unsqueeze(1)
             loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-8) + args.lambda_ * torch.log(a_s + 1e-8))
+            #loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-8) + args.lambda_ * a_s ** 2)
+            
             loss = loss / a_m.size(1) / a_m.size(0)
 
             mse_loss = torch.sum((a_m - labels) ** 2) / a_m.size(1) / a_m.size(0)
@@ -107,6 +110,7 @@ def val_loop(models, data_loader, epoch, args, saveResult=True):
     loss_var_all = 0
 
     predict_y = []
+    variance_y = []
     groundtruth = []
 
     for idx, icml_data in enumerate(data_loader, 1):
@@ -123,7 +127,9 @@ def val_loop(models, data_loader, epoch, args, saveResult=True):
             a_m, a_s = enc.forward(input)
             if not args.regression_delta:
                 a_m = a_m + input[:, 0].unsqueeze(1)
-            loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * torch.log(a_s))
+            loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-8) + args.lambda_ * torch.log(a_s))
+            #loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * a_s ** 2)
+            #loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * a_s )
             loss = loss / a_m.size(1) / a_m.size(0)
 
             mse_loss = torch.sum((a_m - labels) ** 2) / a_m.size(1) / a_m.size(0)
@@ -138,8 +144,8 @@ def val_loop(models, data_loader, epoch, args, saveResult=True):
 
             if not args.regression_delta:
                 a_m = a_m + input[:, 0].unsqueeze(1)
-            # loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * torch.log(a_s + 1e-10))
-            loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * a_s**2)
+            loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-10) + args.lambda_ * torch.log(a_s + 1e-10))
+            #loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 / (a_s + 1e-8) + args.lambda_ * a_s**2)
             loss = loss / a_m.size(1) / a_m.size(0)
 
             abs_loss = torch.sum(torch.abs(a_m - labels)) / a_m.size(1) / a_m.size(0)
@@ -170,6 +176,7 @@ def val_loop(models, data_loader, epoch, args, saveResult=True):
             if idx == 0:
                 if 'npn' in args.enc_type or 'combined' in args.enc_type:
                     predict_y = a_m.data[0]
+                    variance_y = a_s.data[0]
                 else:
                     predict_y = predict.data[0]
 
@@ -177,6 +184,7 @@ def val_loop(models, data_loader, epoch, args, saveResult=True):
             else:
                 if 'npn' in args.enc_type or 'combined' in args.enc_type:
                     predict_y = np.concatenate((predict_y, a_m.data[0]), axis=0)
+                    variance_y = np.concatenate((variance_y, a_m.data[0]), axis=0)
                 else:
                     predict_y = np.concatenate((predict_y, predict.data[0]), axis=0)
                 groundtruth = np.concatenate((groundtruth, labels.data[0]), axis=0)
@@ -185,6 +193,8 @@ def val_loop(models, data_loader, epoch, args, saveResult=True):
         datasave = {}
         datasave['groundtruth'] = groundtruth
         datasave['predict_y'] = predict_y
+        if 'npn' in args.enc_type or 'combined' in args.enc_type:
+            datasave['variance_y'] = variance_y
         np.save('temp_' + args.output.split('/')[-1], datasave)
         import scipy.io
         scipy.io.savemat(os.path.join(config.MAT_PLOT_PATH,

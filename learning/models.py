@@ -60,6 +60,7 @@ class Enc(nn.Module):
     def __init__(self, args):
         super(Enc, self).__init__()
         self.type = args.enc_type
+        self.fc_drop = 0.5
         if self.type == 'mlp':
             width = 64
             self.fc1 = nn.Linear(INPUT_DIM, width)
@@ -72,13 +73,13 @@ class Enc(nn.Module):
             self.bn2 = nn.BatchNorm1d(width)
         elif self.type == 'npn':
             width = 128
-            self.fc1 = NPNLinear(INPUT_DIM-2, width, dual_input=False, first_layer_assign=True)
+            self.fc1 = NPNLinear(INPUT_DIM, width, dual_input=False, first_layer_assign=True)
             self.nonlinear1 = NPNRelu()
             # self.dropout1 = NPNDropout(self.fc_drop)
             self.fc2 = NPNLinear(width, 1)
             # self.nonlinear2 = NPNSigmoid()
         elif self.type == 'cnn':
-            width = 16
+            width = 32
             self.conv0 = nn.Conv1d(1, width, kernel_size=3, stride=2, padding=4)
             self.block1 = BottleNeck1d_3(in_channels=width, hidden_channels=width//2,
                                          out_channels=width * 2, stride=2, kernel_size=3, group_num=width//4)
@@ -91,8 +92,10 @@ class Enc(nn.Module):
             self.block5 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
                                          out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2)
             # 16 left
-            self.pooling = nn.AvgPool1d(kernel_size=16, stride=16)
-            self.fc1 = nn.Linear(width * 4, 1)
+            self.pooling = nn.AvgPool1d(kernel_size=4, stride=4)
+            self.fc1 = nn.Linear(width * 4 * 4, width * 4 * 4)
+            self.fc2 = nn.Linear(width * 4 * 4, 1)
+            self.dropout = nn.Dropout(0.5)
         elif self.type == 'cnn1':
             width = args.cnn_width
             self.conv0 = nn.Conv1d(1, width, kernel_size=3, stride=2, padding=4)
@@ -132,17 +135,18 @@ class Enc(nn.Module):
             self.fc2 = NPNLinear(width * 4, 1)
         elif self.type == 'combined_dis':
             width = 16
+            kernel_size = 3
             self.conv0 = nn.Conv1d(1, width, kernel_size=3, stride=2, padding=4)
             self.block1 = BottleNeck1d_3(in_channels=width, hidden_channels=width//2,
-                                         out_channels=width * 2, stride=2, kernel_size=3, group_num=width//4)
+                                         out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width//4)
             self.block2 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width//2,
-                                         out_channels=width * 2, stride=2, kernel_size=3, group_num=width//4)
+                                         out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width//4)
             self.block3 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width,
-                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2)
+                                         out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width//2)
             self.block4 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
-                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2)
+                                         out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width//2)
             self.block5 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
-                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2)
+                                         out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width//2)
             # 16 left
             self.pooling = nn.AvgPool1d(kernel_size=16, stride=16)
             self.fc1 = NPNLinear(width * 4 + 1, width * 4, dual_input=False, first_layer_assign=False)
@@ -175,8 +179,12 @@ class Enc(nn.Module):
             x = self.block4.forward(x)
             x = self.block5.forward(x)
             x = self.pooling(x)
-            x = x.squeeze(2)
-            x = self.fc1(x)
+            x_size = x.size()
+            # x = x.squeeze(2)
+            x = x.view(x_size[0], x_size[1] * x_size[2])
+            x = F.relu(self.fc1(x))
+            x = self.dropout(x)
+            x = self.fc2(x)
             return x
         elif self.type == 'cnn1':
             x = x.unsqueeze(1)
@@ -217,10 +225,12 @@ class Enc(nn.Module):
             x = self.block4.forward(x)
             x = self.block5.forward(x)
             x = self.pooling(x)
-            x = x.squeeze(2)
+            # x = x.squeeze(2)
+            x_size = x.size()
+            x = x.view(x_size[0], x_size[1] * x_size[2])
             x = torch.cat((dis, x), dim=1)
             x = self.nonlinear1(self.fc1(x))
-            # x = self.dropout1(x)
+           # x = self.dropout1(x)
             x = self.fc2(x)
             a_m, a_s = x
             return a_m, a_s
