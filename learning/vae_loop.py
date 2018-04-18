@@ -32,7 +32,7 @@ def vae_train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
     loss_cnt = 0
 
     for idx, icml_data in enumerate(data_loader, 1):
-        if idx > num_per_epoch//10:
+        if idx > num_per_epoch:
             break
         input, labels, subject, wave, mask, _ = icml_data
         input = Variable(input.cuda())
