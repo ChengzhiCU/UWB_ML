@@ -32,7 +32,7 @@ def vae_train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
     loss_cnt = 0
 
     for idx, icml_data in enumerate(data_loader, 1):
-        if idx > num_per_epoch//100:
+        if idx > num_per_epoch//10:
             break
         input, labels, subject, wave, mask, _ = icml_data
         input = Variable(input.cuda())
@@ -55,7 +55,7 @@ def vae_train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
         marginal_likelihood = torch.sum((y - wave) ** 2) / wave.size(0) / wave.size(1)
         KL_divergence = - torch.mean(0.5 * torch.sum(1 + torch.log(1e-8 + sigma ** 2) - mu ** 2 - sigma ** 2))
 
-        ELBO = marginal_likelihood + KL_divergence
+        ELBO = args.marg_lambda * marginal_likelihood + KL_divergence
 
         npn_loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 * mask / (a_s + 1e-10)
                              + args.lambda_ * torch.log(a_s) * mask)
@@ -165,17 +165,19 @@ def vae_val_loop(models, data_loader, epoch, args, saveResult=False):
                 predict_y = np.concatenate((predict_y, a_m.data[0]), axis=0)
                 variance_y = np.concatenate((variance_y, a_s.data[0]), axis=0)
                 groundtruth = np.concatenate((groundtruth, labels.data[0]), axis=0)
-                if idx % 50 == 0:
+                if idx % 20 == 0:
                     if args.val_plot:
                         import matplotlib.pyplot as plt
                         plt.subplot(2,1,1)
+                        print('plotshape', wave.data[0].cpu().numpy().shape)
                         plt.plot(wave.data[0].cpu().numpy())
                         plt.title('raw')
                         plt.subplot(2, 1, 2)
                         plt.plot(y.data[0].cpu().numpy())
                         plt.title('pred')
-                        plt.show()
-
+                        plt.savefig(os.path.join(config.FIG_PATH, args.output.split('/')[-1],
+                                                 str(epoch) + '_' + str(idx)))
+                        plt.gcf().clear()
                     raw_wave = np.concatenate((raw_wave, np.expand_dims(wave.data[0], axis=0)), axis=0)
                     pred_wave = np.concatenate((pred_wave, np.expand_dims(y.data[0], axis=0)), axis=0)
 

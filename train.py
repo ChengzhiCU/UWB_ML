@@ -21,7 +21,7 @@ parser = argparse.ArgumentParser(description='RF-Sleep Training Script')
 parser.add_argument('--workers', '-j', default=1, type=int, help='number of data loading workers')
 parser.add_argument('--batch', type=int, default=64, help='input batch size')
 parser.add_argument('--epochs', default=30, type=int, help='number of epochs to run')
-parser.add_argument('--seed', default=2000, type=int, help='manual seed')
+parser.add_argument('--seed', default=2333, type=int, help='manual seed')
 parser.add_argument('--ngpu', default=1, type=int, help='number of GPUs to use')
 parser.add_argument('--cnn_width', default=16, type=int, help='number of channels for first layer cnn')
 parser.add_argument('--checkpoint', type=str, help='location of the checkpoint to load')
@@ -47,6 +47,7 @@ parser.add_argument('--regression_delta', default=False, type=bool, help='Regres
 
 parser.set_defaults(augment=True)
 args = parser.parse_args()
+
 
 np.random.seed(args.seed)
 random.seed(args.seed)
@@ -137,7 +138,7 @@ test_dataloader = data.DataLoader(
     pin_memory=False
 )
 
-if 'vae' == args.enc_type:
+if 'vae' == args.enc_type or 'vae_1' == args.enc_type:
     print('initialize vae')
     enc = nn.DataParallel(VaeEnc(args)).cuda()
     dec = nn.DataParallel(VaeDec(args)).cuda()
@@ -193,11 +194,12 @@ best_rmse_metric_test = 99999999999
 best_rmse_epoch = 0
 best_epoch = 0
 
+os.makedirs(os.path.join(config.FIG_PATH, args.output.split('/')[-1]), exist_ok=True)
 fp = open(os.path.join(args.output, 'log.txt'), 'a')
 args.fp = fp
 for epoch in range(args.epochs):
     print("")
-    if args.enc_type == 'vae':
+    if args.enc_type == 'vae' or args.enc_type == 'vae_1':
         train_start_time = time.time()
         train_loss_ave = vae_train_loop(models, train_dataloader, optimizers, lr_schedulers,
                                     epoch, args)
@@ -236,7 +238,7 @@ for epoch in range(args.epochs):
         best_rmse_metric_val = rmse_metric
         best_epoch = epoch
         save_model(model_names, models, args.output, epoch, best_meter_abs_metric_val)  # save models to one zip file
-        if args.enc_type == 'vae':
+        if args.enc_type == 'vae' or args.enc_type == 'vae_1':
             best_rmse_metric_test, best_meter_abs_metric_test = vae_val_loop(models, test_dataloader, epoch,
                                                                              args, saveResult=True)
         elif args.enc_type == 'AE':
@@ -279,3 +281,5 @@ label = datasave['groundtruth']
 predict_y = datasave['predict_y']
 CDF_plot(np.abs(predict_y - label), 200, parsed_folder.split('/')[-1] + '_' + args.output.split('/')[-1]
          + str(best_meter_abs_metric_test))
+
+

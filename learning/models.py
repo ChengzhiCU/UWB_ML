@@ -283,6 +283,36 @@ class VaeEnc(nn.Module):
             # self.dropout1 = NPNDropout(self.fc_drop)
             self.fc2 = NPNLinear(width * 4, 1)
 
+        elif self.type == 'vae_1':
+            self.width = 32
+            width = self.width
+            kernel_size = 5
+            self.conv0 = nn.Conv1d(1, width, kernel_size=kernel_size, stride=2, padding=4+2)
+            self.block1 = BottleNeck1d_3(in_channels=width, hidden_channels=width // 2,
+                                         out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 4)
+            self.block2 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width // 2,
+                                         out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 4)
+            self.block3 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            self.block4 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            self.block5 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
+                                         out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            self.block6 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width * 2,
+                                         out_channels=width * 8, stride=2, kernel_size=kernel_size,
+                                         group_num=width)
+            self.block7 = BottleNeck1d_3(in_channels=width * 8, hidden_channels=width * 2,
+                                         out_channels=width * 8, stride=2, kernel_size=kernel_size,
+                                         group_num=width)
+            # 16 left
+            self.pooling = nn.AvgPool1d(kernel_size=4, stride=4)
+            self.conv_fc = nn.Conv1d(width * 8, width * 8, kernel_size=1, stride=1, padding=0)
+
+            self.fc1 = NPNLinear(width * 4 + 1, width * 4)
+            self.nonlinear1 = NPNRelu()
+            # self.dropout1 = NPNDropout(self.fc_drop)
+            self.fc2 = NPNLinear(width * 4, 1)
+
     def forward(self, x):
         if self.type == 'vae':
             wave, dis = x
@@ -319,15 +349,54 @@ class VaeEnc(nn.Module):
             a_m, a_s = x
             return a_m, a_s, mean, stddev, z
 
+        elif self.type == 'vae_1':
+            wave, dis = x
+            x = wave.unsqueeze(1)
+            dis = dis.unsqueeze(1)
+            x = self.conv0(x)
+            x = self.block1.forward(x)
+            x = self.block2.forward(x)
+            x = self.block3.forward(x)
+            x = self.block4.forward(x)
+            x = self.block5.forward(x)
+            x = self.block6.forward(x)
+            x = self.block7.forward(x)
+            x = self.pooling(x)
+            x = self.conv_fc(x)
+
+            mean = x[:, :self.width * 4, :]
+            mean = mean.contiguous()
+            stddev = F.softplus(x[:, self.width * 4:, :])
+            stddev = stddev.contiguous()
+            mean = mean.view(mean.size(0), mean.size(1) * mean.size(2))
+            stddev = stddev.view(stddev.size(0), stddev.size(1) * stddev.size(2))
+            # print('stddev shape', stddev.size(), self.width, x.size())
+
+            # normal_array = Variable(torch.normal(means=torch.zeros(mean.size()), std=1.0).cuda())
+            normal_array = Variable(stddev.data.new(stddev.size()).normal_())
+            z = normal_array.mul(stddev).add_(mean)
+            # print('z shape', z.size())
+
+            # x = torch.cat((dis, z), dim=1)  # this is one solution
+            x_m = torch.cat((dis, mean), dim=1)
+            x_s = torch.cat((Variable(torch.zeros((x_m.size(0), 1)).cuda()), stddev), dim=1)
+            x = x_m, x_s
+
+            x = self.nonlinear1(self.fc1(x))
+            # x = self.dropout1(x)
+            x = self.fc2(x)
+            a_m, a_s = x
+            return a_m, a_s, mean, stddev, z
+
 
 class AEEnc(nn.Module):
     def __init__(self, args):
         super(AEEnc, self).__init__()
         self.type = args.enc_type
         if self.type == 'AE':
-            self.width = 64
+            self.width = 32
             width = self.width
-            kernel_size = 5
+            kernel_size = 3
             self.conv0 = nn.Conv1d(1, width, kernel_size=kernel_size, stride=2, padding=4)
             self.block1 = BottleNeck1d_3(in_channels=width, hidden_channels=width // 2,
                                          out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 4)
@@ -340,12 +409,12 @@ class AEEnc(nn.Module):
             self.block5 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
                                          out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
             # 16 left
-            self.pooling = nn.AvgPool1d(kernel_size=2, stride=2)
+            self.pooling = nn.AvgPool1d(kernel_size=4, stride=4)
 
-            self.fc1 = NPNLinear(width * 4 * 8 + 1, width * 2, dual_input=False)
+            self.fc1 = NPNLinear(width * 4 * 4 + 1, width * 4 * 4, dual_input=False)
             self.nonlinear1 = NPNRelu()
             # self.dropout1 = NPNDropout(self.fc_drop)
-            self.fc2 = NPNLinear(width * 2, 1)
+            self.fc2 = NPNLinear(width * 4 * 4, 1)
 
     def forward(self, x):
         if self.type == 'AE':
@@ -379,14 +448,28 @@ class VaeDec(nn.Module):
             self.upsample_layer = nn.Upsample(scale_factor=2, mode='nearest')
             self.de_block1 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
                                               out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
-            # self.de_block1_1 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
-            #                                      out_channels=width * 4, stride=2, kernel_size=3, group_num=width // 2)
-            # self.de_block1_2 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
-            #                                      out_channels=width * 4, stride=2, kernel_size=3, group_num=width // 2)
-            # self.de_block1_3 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
-            #                                      out_channels=width * 4, stride=2, kernel_size=3, group_num=width // 2)
-            # self.de_block1_4 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
-            #                                      out_channels=width * 4, stride=2, kernel_size=3, group_num=width // 2)
+            self.de_block2 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
+                                               out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            self.de_block3 = DeBottleNeck1d_3G(in_channels=width * 2, hidden_channels=width // 2,
+                                               out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 4)
+            self.de_block4 = DeBottleNeck1d_3G(in_channels=width * 2, hidden_channels=width // 2,
+                                               out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 4)
+            self.de_block5 = DeBottleNeck1d_3G(in_channels=width * 2, hidden_channels=width // 2,
+                                               out_channels=width, stride=2, kernel_size=kernel_size, group_num=width // 4)
+            self.deconv = nn.ConvTranspose1d(width, 1, kernel_size=5, stride=2, padding=2+4, output_padding=1)
+
+        elif self.type == 'vae_1':
+            width = 16
+            kernel_size = 5
+            self.upsample_layer = nn.Upsample(scale_factor=4, mode='nearest')
+            self.de_block0 = DeBottleNeck1d_3G(in_channels=width * 8, hidden_channels=width * 2,
+                                               out_channels=width * 8, stride=2, kernel_size=kernel_size,
+                                               group_num=width)
+            self.de_block01 = DeBottleNeck1d_3G(in_channels=width * 8, hidden_channels=width * 2,
+                                                out_channels=width * 4, stride=2, kernel_size=kernel_size,
+                                                group_num=width)
+            self.de_block1 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
+                                               out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
             self.de_block2 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
                                                out_channels=width * 2, stride=2, kernel_size=kernel_size, group_num=width // 2)
             self.de_block3 = DeBottleNeck1d_3G(in_channels=width * 2, hidden_channels=width // 2,
@@ -401,20 +484,26 @@ class VaeDec(nn.Module):
         if self.type == 'vae' or self.type == 'vaemlp':
             x = x.view(x.size(0), x.size(1) // 8, 8)
             x = self.upsample_layer(x)
-            # x = torch.cat((x,x,x,x,x,x, x,x,x,x,x,x, x,x,x,x), dim=2)
-            # x = torch.cat((x, x, x, x), dim=2)
             x = self.de_block1.forward(x)
-            # x = self.de_block1_1.forward(x)
-            # x = self.de_block1_2.forward(x)
-            # x = self.de_block1_3.forward(x)
-            # x = self.de_block1_4.forward(x)
             x = self.de_block2.forward(x)
             x = self.de_block3.forward(x) #96
             x = self.de_block4.forward(x) # 192
             x = self.de_block5.forward(x) # 384
             x = self.deconv(x)
             x = x.squeeze(1)
-            # x = x[:, 4:-4]
+            return x
+        if self.type == 'vae_1':
+            x = x.view(x.size(0), x.size(1), 1)
+            x = self.upsample_layer(x)
+            x = self.de_block0.forward(x)
+            x = self.de_block01.forward(x)
+            x = self.de_block1.forward(x)
+            x = self.de_block2.forward(x)
+            x = self.de_block3.forward(x) #96
+            x = self.de_block4.forward(x) # 192
+            x = self.de_block5.forward(x) # 384
+            x = self.deconv(x)
+            x = x.squeeze(1)
             return x
 
 
@@ -423,9 +512,9 @@ class AEDec(nn.Module):
         super(AEDec, self).__init__()
         self.type = args.enc_type
         if self.type == 'AE':
-            width = 64
+            width = 32
             kernel_size = 5
-            self.upsample_layer = nn.Upsample(scale_factor=2, mode='nearest')
+            self.upsample_layer = nn.Upsample(scale_factor=4, mode='nearest')
             self.de_block1 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
                                                out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
             self.de_block2 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
