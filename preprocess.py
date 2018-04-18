@@ -31,11 +31,20 @@ import argparse
 # parse_mat_to_np.generate_data_all()
 
 
-# parse new los data
-parse_mat_to_np = ParseMAt(
+# # parse new los data
+# parse_mat_to_np = ParseMAt(
+#     overwrite=False,
+#     input_path=MatDataLOS6F_NEW_Path,
+#     save_path=LOS_PAESED_FILES_NEW
+# )
+# parse_mat_to_np.generate_data_all()
+
+
+from preprocess.parse_unlabeled_mat import ParseUnlabeledMAt
+parse_mat_to_np = ParseUnlabeledMAt(
     overwrite=False,
-    input_path=MatDataLOS6F_NEW_Path,
-    save_path=LOS_PAESED_FILES_NEW
+    input_path=UNLABELED_MATDATA_PATH,
+    save_path=UNLABELED_PARSED
 )
 parse_mat_to_np.generate_data_all()
 

@@ -5,8 +5,6 @@ from learning.datasets_config import get_random_filenames
 from learning.utils import *
 from learning.datasets import *
 from learning.loops import train_loop, val_loop
-from learning.loops_npn import train_loop_npn, val_loop_npn
-from learning.loops_combined import train_loop_combined, val_loop_combined
 from learning.vae_loop import vae_train_loop, vae_val_loop
 from learning.AE_loop import AE_train_loop, AE_val_loop
 from learning.vae_mlp_loop import vaeMlp_train_loop, vaeMlp_val_loop
@@ -22,7 +20,7 @@ import torch
 parser = argparse.ArgumentParser(description='RF-Sleep Training Script')
 parser.add_argument('--workers', '-j', default=1, type=int, help='number of data loading workers')
 parser.add_argument('--batch', type=int, default=64, help='input batch size')
-parser.add_argument('--epochs', default=3, type=int, help='number of epochs to run')
+parser.add_argument('--epochs', default=30, type=int, help='number of epochs to run')
 parser.add_argument('--seed', default=2000, type=int, help='manual seed')
 parser.add_argument('--ngpu', default=1, type=int, help='number of GPUs to use')
 parser.add_argument('--cnn_width', default=16, type=int, help='number of channels for first layer cnn')
@@ -36,11 +34,14 @@ parser.add_argument('--output', default=time.strftime('%m-%d-%H-%M'),
                     type=str, help='folder to output model checkpoints')
 parser.add_argument('--print-freq', default=20, type=int, help='print frequency')
 parser.add_argument('--evaluate', action='store_true', help='evaluate model on validation set')
+parser.add_argument('--use_unlabeled', action='store_true', help='evaluate model on validation set')
+parser.add_argument('--val_plot', action='store_true', help='evaluate model on validation set')
 
 parser.add_argument('--train-epoch', default=1, type=int, help='begining epoch No., just for saving model')
-parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
+parser.add_argument('--lr', default=1e-2, type=float, help='learning rate')
 parser.add_argument('--lambda_', default=0.3, type=float, help='ratio of mse and variance')
 parser.add_argument('--lambda_vae', default=0.5, type=float, help='ratio of npn and vae loss')
+parser.add_argument('--marg_lambda', default=3, type=float, help='ratio of npn and vae loss')
 parser.add_argument('--add_noise', default=0, type=float, help='std of noise')
 parser.add_argument('--regression_delta', default=False, type=bool, help='Regress error or not')
 
@@ -88,9 +89,11 @@ elif args.data_filename == 'all_258.npy':
 args.parsed_folder = parsed_folder
 train_dataset = UWBDataset(
     labeled_path=os.path.join(parsed_folder, args.data_filename),
-    unlabelled_path=[],
+    unlabelled_path=os.path.join(config.UNLABELED_PARSED, 'unlabeled_11.npy'),
     train_index_file=os.path.join(parsed_folder, 'train_tr_ind_sep.npy'),
-    regression_delta=args.regression_delta
+    regression_delta=args.regression_delta,
+    enc_type=args.enc_type,
+    used_unlabeled=args.use_unlabeled
     # train_index_file=os.path.join(config.PAESED_FILES, 'train_ind_sep.npy')
 )
 
@@ -98,35 +101,39 @@ val_dataset = UWBDataset(
     labeled_path=os.path.join(parsed_folder, args.data_filename),
     unlabelled_path=[],
     train_index_file=os.path.join(parsed_folder, 'train_val_ind_sep.npy'),
-    regression_delta=args.regression_delta
+    regression_delta=args.regression_delta,
+    enc_type=args.enc_type,
+    used_unlabeled=False
 )
 
 test_dataset = UWBDataset(
     labeled_path=os.path.join(parsed_folder, args.data_filename),
     unlabelled_path=[],
     train_index_file=os.path.join(parsed_folder, 'test_ind_sep.npy'),
-    regression_delta=args.regression_delta
+    regression_delta=args.regression_delta,
+    enc_type=args.enc_type,
+    used_unlabeled=False
 )
 
 train_dataloader = data.DataLoader(
     dataset=train_dataset,
     batch_size=args.batch,
     shuffle=True,
-    num_workers=1,
+    num_workers=0,
     pin_memory=False
 )
 val_dataloader = data.DataLoader(
     dataset=val_dataset,
     batch_size=args.batch,
     shuffle=False,
-    num_workers=1,
+    num_workers=0,
     pin_memory=False
 )
 test_dataloader = data.DataLoader(
     dataset=test_dataset,
     batch_size=args.batch,
     shuffle=False,
-    num_workers=1,
+    num_workers=0,
     pin_memory=False
 )
 
@@ -159,7 +166,8 @@ else:
 
 optimizers = [opt_non_D]
 
-lr_scheduler_non_D = lr_scheduler.ExponentialLR(optimizer=opt_non_D, gamma=0.5 ** (1/150))
+# lr_scheduler_non_D = lr_scheduler.ExponentialLR(optimizer=opt_non_D, gamma=0.5 ** (1/150))
+lr_scheduler_non_D = lr_scheduler.MultiStepLR(optimizer=opt_non_D, milestones=[8, 20], gamma=0.1)
 lr_schedulers = [lr_scheduler_non_D]
 
 # optionally load model from a checkpoint
@@ -266,7 +274,7 @@ for key, val in vars(args).items():
 
 
 from visualization.utils import CDF_plot
-datasave = np.load('temp_' + args.output.split('/')[-1] + '.npy')[()]
+datasave = np.load('../npy_bk/temp_' + args.output.split('/')[-1] + '.npy')[()]
 label = datasave['groundtruth']
 predict_y = datasave['predict_y']
 CDF_plot(np.abs(predict_y - label), 200, parsed_folder.split('/')[-1] + '_' + args.output.split('/')[-1]
