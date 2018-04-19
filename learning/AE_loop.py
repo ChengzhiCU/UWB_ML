@@ -29,7 +29,7 @@ def AE_train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
     loss_cnt = 0
 
     for idx, icml_data in enumerate(data_loader, 1):
-        if idx > num_per_epoch:
+        if idx > num_per_epoch//100:
             break
         input, labels, subject, wave, mask, _ = icml_data
         input = Variable(input.cuda())
@@ -102,6 +102,7 @@ def AE_val_loop(models, data_loader, epoch, args, saveResult=True):
 
     loss_cnt = 0
     predict_y = []
+    estimate_d = []
     groundtruth = []
     pred_wave = []
     raw_wave = []
@@ -110,10 +111,12 @@ def AE_val_loop(models, data_loader, epoch, args, saveResult=True):
     for idx, icml_data in enumerate(data_loader, 0):
         if idx > num_per_epoch:
             break
-        input, labels, subject, wave, _, _ = icml_data
+        input, labels, subject, wave, _, dist = icml_data
         input = Variable(input.cuda())
         labels = Variable(labels.cuda())
         wave = Variable(wave.cuda())
+        dist = dist.numpy()
+
         dis = input[:, 0]
 
         a_m, a_s, z = enc.forward((wave, dis))
@@ -145,15 +148,17 @@ def AE_val_loop(models, data_loader, epoch, args, saveResult=True):
 
         if saveResult:
             if idx == 0:
-                predict_y = a_m.data[0]
-                variance_y = a_s.data[0]
-                groundtruth = labels.data[0]
+                predict_y = a_m.data.cpu().numpy()
+                variance_y = a_s.data.cpu().numpy()
+                groundtruth = labels.data.cpu().numpy()
+                estimate_d = dist
                 raw_wave = np.expand_dims(wave.data[0], axis=0)
                 pred_wave = np.expand_dims(y.data[0], axis=0)
             else:
-                predict_y = np.concatenate((predict_y, a_m.data[0]), axis=0)
-                variance_y = np.concatenate((variance_y, a_s.data[0]), axis=0)
-                groundtruth = np.concatenate((groundtruth, labels.data[0]), axis=0)
+                predict_y = np.concatenate((predict_y, a_m.data.cpu().numpy()), axis=0)
+                variance_y = np.concatenate((variance_y, a_s.data.cpu().numpy()), axis=0)
+                groundtruth = np.concatenate((groundtruth, labels.data.cpu().numpy()), axis=0)
+                estimate_d = np.concatenate((estimate_d, dist), axis=0)
                 if idx % 20 == 0:
                     if args.val_plot:
                         import matplotlib.pyplot as plt
@@ -175,6 +180,7 @@ def AE_val_loop(models, data_loader, epoch, args, saveResult=True):
         datasave = {}
         datasave['groundtruth'] = groundtruth
         datasave['predict_y'] = predict_y
+        datasave['estimate_d'] = estimate_d
         datasave['variance_y'] = variance_y
         datasave['raw_wave'] = raw_wave
         datasave['pred_wave'] = pred_wave
@@ -184,11 +190,10 @@ def AE_val_loop(models, data_loader, epoch, args, saveResult=True):
         scipy.io.savemat(os.path.join(config.MAT_PLOT_PATH,
                                       args.parsed_folder.split('/')[-1] + '_' + args.output.split('/')[-1]), datasave)
 
-    string_out = "val loss = {} certainty = {}  mse_square_loss = {}  average meter = {}\n" \
-                 "ELBO = {}   marginal_likelihood = {}   KL_divergence = {}\n" \
+    string_out = "val loss = {} \t certainty = {} \t mse_square_loss = {} \t average meter = {}\t \
+                 marginal_likelihood = {}\n" \
         .format(loss_all / loss_cnt, (loss_var_all / loss_cnt) ** 0.5,
-                loss_mse_all / loss_cnt, loss_abs_all / loss_cnt, loss_ELBO_all / loss_cnt, loss_marginal_likelihood_all / loss_cnt,
-                loss_KL_divergence_all / loss_cnt)
+                loss_mse_all / loss_cnt, loss_abs_all / loss_cnt, loss_marginal_likelihood_all / loss_cnt)
     print(string_out)
     args.fp.write(string_out)
     return loss_mse_all / loss_cnt, loss_abs_all / loss_cnt

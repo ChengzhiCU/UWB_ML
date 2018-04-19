@@ -7,7 +7,7 @@ import os
 
 class UWBDataset(data.Dataset):
     def __init__(self, labeled_path, unlabelled_path, train_index_file, enc_type, used_unlabeled=False,
-                 regression_delta=True, is_norm=True, wave_cut=True):
+                 regression_delta=True, is_norm=True, wave_cut=True, norm_seperatedly=True):
         self.used_unlabeled = used_unlabeled
 
         if used_unlabeled == False:
@@ -60,11 +60,12 @@ class UWBDataset(data.Dataset):
             labeled_wave = labeled_data_t['wave']
             # labeled_feature = (labeled_feature - np.mean(labeled_feature, axis=0)) / np.std(labeled_feature, axis=0)
             # print('mean', np.mean(labeled_wave).shape)
-            labeled_wave = (labeled_wave - np.mean(labeled_wave)) / np.std(labeled_wave)
 
             unlab_feature = unlabeled_data['extracted_features']
             unlab_wave = unlabeled_data['wave']
-            unlab_wave = (unlab_wave - np.mean(unlab_wave)) / np.std(unlab_wave)
+            if norm_seperatedly:
+                labeled_wave = (labeled_wave - np.mean(labeled_wave)) / np.std(labeled_wave)
+                unlab_wave = (unlab_wave - np.mean(unlab_wave)) / np.std(unlab_wave)
 
             wave = np.concatenate((labeled_wave, unlab_wave), axis=0)
             feature = np.concatenate((labeled_feature, unlab_feature), axis=0)
@@ -77,7 +78,10 @@ class UWBDataset(data.Dataset):
             # if wave_cut:
             #     wave = wave[:, 504:]
             self.feature_norm = (feature - np.mean(feature, axis=0)) / np.std(feature, axis=0)
-            self.wave_norm = wave# (wave - np.mean(wave, axis=0)) / np.std(wave, axis=0)
+            if norm_seperatedly:
+                self.wave_norm = wave
+            else:
+                self.wave_norm = (wave - np.mean(wave)) / np.std(wave)
 
     def __len__(self):
         return self.index_list.shape[0]

@@ -27,14 +27,15 @@ parser.add_argument('--cnn_width', default=16, type=int, help='number of channel
 parser.add_argument('--checkpoint', type=str, help='location of the checkpoint to load')
 parser.add_argument('--enc_type', default='combined_dis', type=str, help='type of models') #mlp, cnn, npn, combined_dis
 # parser.add_argument('--data_filename', default='all_698.npy', type=str, help='type of models')
-parser.add_argument('--data_filename', default='all_436.npy', type=str, help='type of models')
-# parser.add_argument('--data_filename', default='all_258.npy', type=str, help='type of models')
+# parser.add_argument('--data_filename', default='all_436.npy', type=str, help='type of models')
+parser.add_argument('--data_filename', default='all_258.npy', type=str, help='type of models')
 parser.add_argument('--loss_type', default='L1', type=str, help='type of models')
 parser.add_argument('--output', default=time.strftime('%m-%d-%H-%M'),
                     type=str, help='folder to output model checkpoints')
 parser.add_argument('--print-freq', default=20, type=int, help='print frequency')
 parser.add_argument('--evaluate', action='store_true', help='evaluate model on validation set')
 parser.add_argument('--use_unlabeled', action='store_true', help='evaluate model on validation set')
+parser.add_argument('--norm_together', action='store_true', help='evaluate model on validation set')
 parser.add_argument('--val_plot', action='store_true', help='evaluate model on validation set')
 
 parser.add_argument('--train-epoch', default=1, type=int, help='begining epoch No., just for saving model')
@@ -94,7 +95,8 @@ train_dataset = UWBDataset(
     train_index_file=os.path.join(parsed_folder, 'train_tr_ind_sep.npy'),
     regression_delta=args.regression_delta,
     enc_type=args.enc_type,
-    used_unlabeled=args.use_unlabeled
+    used_unlabeled=args.use_unlabeled,
+    norm_seperatedly=not args.norm_together
     # train_index_file=os.path.join(config.PAESED_FILES, 'train_ind_sep.npy')
 )
 

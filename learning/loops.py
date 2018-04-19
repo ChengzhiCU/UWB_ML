@@ -117,8 +117,9 @@ def val_loop(models, data_loader, epoch, args, saveResult=True):
     predict_y = []
     variance_y = []
     groundtruth = []
+    estimate_d = []
 
-    for idx, icml_data in enumerate(data_loader, 1):
+    for idx, icml_data in enumerate(data_loader, 0):
         if idx > num_per_epoch:
             break
         input, labels, subject, wave, _, dis = icml_data
@@ -180,24 +181,27 @@ def val_loop(models, data_loader, epoch, args, saveResult=True):
         if saveResult:
             if idx == 0:
                 if 'npn' in args.enc_type or 'combined' in args.enc_type:
-                    predict_y = a_m.data[0]
-                    variance_y = a_s.data[0]
+                    predict_y = a_m.data.cpu().numpy()
+                    variance_y = a_s.data.cpu().numpy()
                 else:
-                    predict_y = predict.data[0]
+                    predict_y = predict.data.cpu().numpy()
+                groundtruth = labels.data.cpu().numpy()
+                estimate_d = dis.data.cpu().numpy()
 
-                groundtruth = labels.data[0]
             else:
                 if 'npn' in args.enc_type or 'combined' in args.enc_type:
-                    predict_y = np.concatenate((predict_y, a_m.data[0]), axis=0)
-                    variance_y = np.concatenate((variance_y, a_s.data[0]), axis=0)
+                    predict_y = np.concatenate((predict_y, a_m.data.cpu().numpy()), axis=0)
+                    variance_y = np.concatenate((variance_y, a_s.data.cpu().numpy()), axis=0)
                 else:
-                    predict_y = np.concatenate((predict_y, predict.data[0]), axis=0)
-                groundtruth = np.concatenate((groundtruth, labels.data[0]), axis=0)
+                    predict_y = np.concatenate((predict_y, predict.data.cpu().numpy()), axis=0)
+                groundtruth = np.concatenate((groundtruth, labels.data.cpu().numpy()), axis=0)
+                estimate_d = np.concatenate((estimate_d, dis.data.cpu().numpy()), axis=0)
 
     if saveResult:
         datasave = {}
         datasave['groundtruth'] = groundtruth
         datasave['predict_y'] = predict_y
+        datasave['estimate_d'] = estimate_d
         if 'npn' in args.enc_type or 'combined' in args.enc_type:
             datasave['variance_y'] = variance_y
         np.save('../npy_bk/temp_' + args.output.split('/')[-1], datasave)
