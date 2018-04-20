@@ -55,7 +55,7 @@ def vae_train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
         marginal_likelihood = torch.sum((y - wave) ** 2) / wave.size(0) / wave.size(1)
         KL_divergence = - torch.mean(0.5 * torch.sum(1 + torch.log(1e-8 + sigma ** 2) - mu ** 2 - sigma ** 2))
 
-        ELBO = args.marg_lambda * marginal_likelihood + KL_divergence
+        ELBO = args.marg_lambda * marginal_likelihood + (1 - args.marg_lambda) *KL_divergence
 
         npn_loss = torch.sum((1 - args.lambda_) * (a_m - labels) ** 2 * mask / (a_s + 1e-10)
                              + args.lambda_ * torch.log(a_s) * mask)

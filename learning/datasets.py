@@ -6,8 +6,8 @@ import os
 
 
 class UWBDataset(data.Dataset):
-    def __init__(self, labeled_path, unlabelled_path, train_index_file, enc_type, used_unlabeled=False,
-                 regression_delta=True, is_norm=True, wave_cut=True, norm_seperatedly=True):
+    def __init__(self, labeled_path, unlabelled_path, train_index_file, is_train, enc_type, used_unlabeled=False,
+                 regression_delta=True, is_norm=True, wave_cut=True, norm_seperatedly=True, unsupervised_learn_test=False):
         self.used_unlabeled = used_unlabeled
 
         if used_unlabeled == False:
@@ -16,11 +16,17 @@ class UWBDataset(data.Dataset):
             self.is_norm = is_norm
             self.regression_delta = regression_delta
 
-            self.index_list = np.load(train_index_file)
-            self.labeled_data['mask'] = np.ones_like(self.labeled_data['label'], dtype=np.float32)
-            print('index size', self.index_list.shape)
-
             feature = self.labeled_data['extracted_features']
+            if unsupervised_learn_test and is_train:
+                self.index_list = np.asarray([i for i in range(feature.shape[0])], dtype=np.int32)
+                mask = np.zeros_like(self.labeled_data['label'], dtype=np.float32)
+                tr_index = np.load(train_index_file)
+                mask[tr_index] = 1
+                self.labeled_data['mask'] = mask
+            else:
+                self.index_list = np.load(train_index_file)
+                self.labeled_data['mask'] = np.ones_like(self.labeled_data['label'], dtype=np.float32)
+
             self.dis = feature[:, 0]
             wave = self.labeled_data['wave']
             # if wave_cut:
@@ -40,15 +46,24 @@ class UWBDataset(data.Dataset):
 
             labeled_data_t = np.load(self.labeled_path)[()]
             unlabeled_data = np.load(self.unlabeled_path)[()]
-
             labeled_label = labeled_data_t['label']
-            labeled_mask = np.ones_like(labeled_label, dtype=np.float32)
+
+            if unsupervised_learn_test and is_train:
+                labeled_index_list = [i for i in range(labeled_data_t['label'].shape[0])]
+                mask = np.zeros_like(labeled_data_t['label'], dtype=np.float32)
+                tr_index = np.load(train_index_file)
+                mask[tr_index] = 1
+                labeled_mask = mask
+            else:
+                labeled_mask = np.ones_like(labeled_label, dtype=np.float32)
+                labeled_index_list = np.load(train_index_file)
+
             unlab_label = np.zeros_like(unlabeled_data['label'], dtype=np.float32)
             unlabeled_mask = unlab_label
 
             labeled_wave_len = labeled_label.shape[0]
             unlabeled_wave_len = unlab_label.shape[0]
-            labeled_index_list = np.load(train_index_file)
+
             self.index_list = np.concatenate((labeled_index_list, np.asarray([i for i in range(labeled_wave_len,
                                               labeled_wave_len + unlabeled_wave_len)], dtype=np.int32)), axis=0)
             print('index list shape', self.index_list.shape)
@@ -87,23 +102,26 @@ class UWBDataset(data.Dataset):
         return self.index_list.shape[0]
 
     def __getitem__(self, index):
-        data_index = int(self.index_list[index])
-        wave = self.labeled_data['wave'][data_index]
-        feature = self.labeled_data['extracted_features'][data_index]
-        label = self.labeled_data['label'][data_index]
-        mask = self.labeled_data['mask'][data_index]
-        dis = self.dis[data_index]
+        total_len = self.labeled_data['extracted_features'].shape[0]
+        data_index = min(int(self.index_list[index]), total_len-1)
+        try:
+            # wave = self.labeled_data['wave'][data_index]
+            feature = self.labeled_data['extracted_features'][data_index]
+            label = self.labeled_data['label'][data_index]
+            mask = self.labeled_data['mask'][data_index]
+            dis = self.dis[data_index]
 
-        if self.regression_delta:
-            label = label - feature[0]
-        else:
-            pass
+            if self.regression_delta:
+                label = label - feature[0]
+            else:
+                pass
 
-        subject = self.labeled_data['subject'][data_index]
+            subject = self.labeled_data['subject'][data_index]
 
-        if self.is_norm:
             feature = self.feature_norm[data_index]
             # feature[0] = 0 #####
             wave = self.wave_norm[data_index]
+        except:
+            print('index', data_index, self.labeled_data['extracted_features'].shape)
 
         return feature, label, subject, wave, mask, dis

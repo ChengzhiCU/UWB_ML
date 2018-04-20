@@ -27,22 +27,26 @@ parser.add_argument('--cnn_width', default=16, type=int, help='number of channel
 parser.add_argument('--checkpoint', type=str, help='location of the checkpoint to load')
 parser.add_argument('--enc_type', default='combined_dis', type=str, help='type of models') #mlp, cnn, npn, combined_dis
 # parser.add_argument('--data_filename', default='all_698.npy', type=str, help='type of models')
-# parser.add_argument('--data_filename', default='all_436.npy', type=str, help='type of models')
-parser.add_argument('--data_filename', default='all_258.npy', type=str, help='type of models')
+parser.add_argument('--data_filename', default='all_436.npy', type=str, help='type of models')
+# parser.add_argument('--data_filename', default='all_258.npy', type=str, help='type of models')
 parser.add_argument('--loss_type', default='L1', type=str, help='type of models')
 parser.add_argument('--output', default=time.strftime('%m-%d-%H-%M'),
                     type=str, help='folder to output model checkpoints')
 parser.add_argument('--print-freq', default=20, type=int, help='print frequency')
 parser.add_argument('--evaluate', action='store_true', help='evaluate model on validation set')
-parser.add_argument('--use_unlabeled', action='store_true', help='evaluate model on validation set')
-parser.add_argument('--norm_together', action='store_true', help='evaluate model on validation set')
+parser.add_argument('--use_unlabeled', action='store_true', help='using unlabeled dataset')
+parser.add_argument('--norm_together', action='store_true', help='normalize the labeled and unlabeled dataset together')
 parser.add_argument('--val_plot', action='store_true', help='evaluate model on validation set')
+parser.add_argument('--little_input', action='store_true', help='mode for evaluate the very few little train input')
+parser.add_argument('--tr_testdata', action='store_true', help='use unsupervised learning method to train test set')
+parser.add_argument('--data_tr_per', default=0.1, type=float, help='ratio of training dataset')
+parser.add_argument('--data_val_per', default=0.1, type=float, help='ratio of val dataset')
 
 parser.add_argument('--train-epoch', default=1, type=int, help='begining epoch No., just for saving model')
 parser.add_argument('--lr', default=1e-2, type=float, help='learning rate')
 parser.add_argument('--lambda_', default=0.3, type=float, help='ratio of mse and variance')
 parser.add_argument('--lambda_vae', default=0.5, type=float, help='ratio of npn and vae loss')
-parser.add_argument('--marg_lambda', default=3, type=float, help='ratio of npn and vae loss')
+parser.add_argument('--marg_lambda', default=0.9, type=float, help='ratio of KL and marginal likelihood')
 parser.add_argument('--add_noise', default=0, type=float, help='std of noise')
 parser.add_argument('--regression_delta', default=False, type=bool, help='Regress error or not')
 
@@ -92,7 +96,9 @@ args.parsed_folder = parsed_folder
 train_dataset = UWBDataset(
     labeled_path=os.path.join(parsed_folder, args.data_filename),
     unlabelled_path=os.path.join(config.UNLABELED_PARSED, 'unlabeled_11.npy'),
-    train_index_file=os.path.join(parsed_folder, 'train_tr_ind_sep.npy'),
+    train_index_file=os.path.join(parsed_folder, 'train_tr_ind_sep{}_{}.npy'.format(args.data_tr_per, args.data_val_per) if args.little_input else 'train_tr_ind_sep.npy'),
+    is_train=True,
+    unsupervised_learn_test=args.tr_testdata,
     regression_delta=args.regression_delta,
     enc_type=args.enc_type,
     used_unlabeled=args.use_unlabeled,
@@ -103,7 +109,8 @@ train_dataset = UWBDataset(
 val_dataset = UWBDataset(
     labeled_path=os.path.join(parsed_folder, args.data_filename),
     unlabelled_path=[],
-    train_index_file=os.path.join(parsed_folder, 'train_val_ind_sep.npy'),
+    train_index_file=os.path.join(parsed_folder, 'train_val_ind_sep{}_{}.npy'.format(args.data_tr_per, args.data_val_per) if args.little_input else 'train_val_ind_sep.npy'),
+    is_train=False,
     regression_delta=args.regression_delta,
     enc_type=args.enc_type,
     used_unlabeled=False
@@ -112,7 +119,8 @@ val_dataset = UWBDataset(
 test_dataset = UWBDataset(
     labeled_path=os.path.join(parsed_folder, args.data_filename),
     unlabelled_path=[],
-    train_index_file=os.path.join(parsed_folder, 'test_ind_sep.npy'),
+    train_index_file=os.path.join(parsed_folder, 'test_ind_sep{}_{}.npy'.format(args.data_tr_per, args.data_val_per) if args.little_input else 'test_ind_sep.npy'),
+    is_train=False,
     regression_delta=args.regression_delta,
     enc_type=args.enc_type,
     used_unlabeled=False
@@ -139,6 +147,9 @@ test_dataloader = data.DataLoader(
     num_workers=0,
     pin_memory=False
 )
+
+if '\r' in args.enc_type:
+    args.enc_type = args.enc_type[:-1]
 
 if 'vae' == args.enc_type or 'vae_1' == args.enc_type:
     print('initialize vae')
@@ -169,8 +180,10 @@ else:
 
 optimizers = [opt_non_D]
 
-# lr_scheduler_non_D = lr_scheduler.ExponentialLR(optimizer=opt_non_D, gamma=0.5 ** (1/150))
-lr_scheduler_non_D = lr_scheduler.MultiStepLR(optimizer=opt_non_D, milestones=[8, 20], gamma=0.1)
+if 'vae' in args.enc_type and False:
+    lr_scheduler_non_D = lr_scheduler.MultiStepLR(optimizer=opt_non_D, milestones=[3, 10], gamma=0.1)
+else:
+    lr_scheduler_non_D = lr_scheduler.ExponentialLR(optimizer=opt_non_D, gamma=0.5 ** (1 / 100))
 lr_schedulers = [lr_scheduler_non_D]
 
 # optionally load model from a checkpoint

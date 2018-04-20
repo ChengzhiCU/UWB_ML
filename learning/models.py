@@ -408,10 +408,16 @@ class AEEnc(nn.Module):
                                          out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
             self.block5 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
                                          out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
-            # 16 left
-            self.pooling = nn.AvgPool1d(kernel_size=4, stride=4)
 
-            self.fc1 = NPNLinear(width * 4 * 4 + 1, width * 4 * 4, dual_input=False)
+            self.block6 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width * 2,
+                                         out_channels=width * 8, stride=2, kernel_size=kernel_size, group_num=width //2 )
+
+            self.block7 = BottleNeck1d_3(in_channels=width * 8, hidden_channels=width * 2,
+                                         out_channels=width * 8, stride=2, kernel_size=kernel_size, group_num=width // 2)
+            # 4 left
+            self.pooling = nn.AvgPool1d(kernel_size=2, stride=2)
+
+            self.fc1 = NPNLinear(width * 8 * 2 + 1, width * 4 * 4, dual_input=False)
             self.nonlinear1 = NPNRelu()
             # self.dropout1 = NPNDropout(self.fc_drop)
             self.fc2 = NPNLinear(width * 4 * 4, 1)
@@ -427,6 +433,8 @@ class AEEnc(nn.Module):
             x = self.block3.forward(x)
             x = self.block4.forward(x)
             x = self.block5.forward(x)
+            x = self.block6.forward(x)
+            x = self.block7.forward(x)
             z = self.pooling(x)
 
             zz = z.view(z.size(0), z.size(1) * z.size(2))
@@ -435,6 +443,7 @@ class AEEnc(nn.Module):
             # x = self.dropout1(x)
             x = self.fc2(x)
             a_m, a_s = x
+            # print('size z', z.size())
             return a_m, a_s, z
 
 
@@ -514,7 +523,14 @@ class AEDec(nn.Module):
         if self.type == 'AE':
             width = 32
             kernel_size = 5
-            self.upsample_layer = nn.Upsample(scale_factor=4, mode='nearest')
+            self.upsample_layer = nn.Upsample(scale_factor=2, mode='nearest')
+            self.de_block0 = DeBottleNeck1d_3G(in_channels=width * 8, hidden_channels=width,
+                                               out_channels=width * 8, stride=2, kernel_size=kernel_size,
+                                               group_num=width // 2)
+            self.de_block01 = DeBottleNeck1d_3G(in_channels=width * 8, hidden_channels=width,
+                                               out_channels=width * 4, stride=2, kernel_size=kernel_size,
+                                               group_num=width // 2)
+
             self.de_block1 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
                                                out_channels=width * 4, stride=2, kernel_size=kernel_size, group_num=width // 2)
             self.de_block2 = DeBottleNeck1d_3G(in_channels=width * 4, hidden_channels=width,
@@ -530,6 +546,8 @@ class AEDec(nn.Module):
     def forward(self, x):
         if self.type == 'AE':
             x = self.upsample_layer(x)
+            x = self.de_block0.forward(x)
+            x = self.de_block01.forward(x)
             x = self.de_block1.forward(x)
             x = self.de_block2.forward(x)
             x = self.de_block3.forward(x)  #96

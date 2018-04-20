@@ -7,10 +7,14 @@ import random
 
 
 class ParseMAt:
-    def __init__(self, overwrite, input_path=MatDataPath, save_path=PAESED_FILES):
+    def __init__(self, overwrite, input_path=MatDataPath, save_path=PAESED_FILES, manual_split_data=False,
+                 data_percent=[0.1, 0.1, 0.8], save_npy=True):
         self.overwrite = overwrite
         self.input_path = input_path
         self.save_path = save_path
+        self.manual_split_data = manual_split_data
+        self.data_percent = data_percent
+        self.save_npy = save_npy
 
     def generate_data_all(self):
         """ generate all the data using multi process"""
@@ -49,8 +53,15 @@ class ParseMAt:
         # print('shuffled_list', shuffled_list)
         # train_point_ind = shuffled_list[:int(len(filelist) * 0.8)]
         # test_point_ind = shuffled_list[int(len(filelist) * 0.8):]
-        train_point_ind = random.sample(all_list, int(len(filelist) * 0.8))
-        train_tr_point_ind = random.sample(train_point_ind, int(len(train_point_ind) * 0.8))
+        if self.manual_split_data:
+            data_percent=[0,0,0]
+            data_percent[0] = self.data_percent[0] + self.data_percent[1]
+            data_percent[1] = self.data_percent[1] / data_percent[0]
+            train_point_ind = random.sample(all_list, int(len(filelist) * data_percent[0]))
+            train_tr_point_ind = random.sample(train_point_ind, int(len(train_point_ind) * data_percent[1]))
+        else:
+            train_point_ind = random.sample(all_list, int(len(filelist) * 0.8))
+            train_tr_point_ind = random.sample(train_point_ind, int(len(train_point_ind) * 0.8))
         print(train_tr_point_ind)
 
         train_tr_data_ind = []
@@ -78,12 +89,12 @@ class ParseMAt:
             else:
                 test_data_ind = test_data_ind + num_list_block
 
-            data = {
-                'wave': wave_data,
-                'extracted_features': extracted_feature,
-                'label': label,
-                'subject': scene_index
-            }
+            # data = {
+            #     'wave': wave_data,
+            #     'extracted_features': extracted_feature,
+            #     'label': label,
+            #     'subject': scene_index
+            # }
             # np.save(os.path.join(self.save_path, each[:-4]), data)
             print('parse {} succeed'.format(os.path.join(self.save_path, each[:-4])))
 
@@ -104,22 +115,23 @@ class ParseMAt:
             'label': all_label.astype(np.float32),
             'subject': all_subject.astype(np.float32)
         }
-        np.save(os.path.join(self.save_path, 'all_{}'.format(len(filelist))), all_data)
+        if self.save_npy:
+            np.save(os.path.join(self.save_path, 'all_{}'.format(len(filelist))), all_data)
 
         data_num = all_label.shape[0]
-        # train_data_ind = [i for i in range(data_num) if i%5]
-        # test_data_ind = [i for i in range(data_num) if  i%5==0]
 
-
-
-        # random
-        # train_data_ind = np.random.choice(data_num, int(data_num * 0.8), replace=False)
-        # or you can permutate and pick up the first 80% data
-        # test_data_ind = [i for i in range(data_num) if not i%5]
         print(test_data_ind[:1000])
-        np.save(os.path.join(self.save_path, 'train_tr_ind_sep'), train_tr_data_ind)
-        np.save(os.path.join(self.save_path, 'train_val_ind_sep'), train_val_data_ind)
-        np.save(os.path.join(self.save_path, 'test_ind_sep'), test_data_ind)
+        if not self.manual_split_data:
+            np.save(os.path.join(self.save_path, 'train_tr_ind_sep'), train_tr_data_ind)
+            np.save(os.path.join(self.save_path, 'train_val_ind_sep'), train_val_data_ind)
+            np.save(os.path.join(self.save_path, 'test_ind_sep'), test_data_ind)
+        else:
+            np.save(os.path.join(self.save_path, 'train_tr_ind_sep' + str(self.data_percent[0]) +
+                                 '_' + str(self.data_percent[1])), train_tr_data_ind)
+            np.save(os.path.join(self.save_path, 'train_val_ind_sep' + str(self.data_percent[0]) +
+                                 '_' + str(self.data_percent[1])), train_val_data_ind)
+            np.save(os.path.join(self.save_path, 'test_ind_sep' + str(self.data_percent[0])
+                                 + '_' + str(self.data_percent[1])), test_data_ind)
 
 
 

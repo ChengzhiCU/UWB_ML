@@ -46,8 +46,8 @@ def AE_train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
         a_m, a_s, z = enc.forward((wave_in, dis))
         y = dec.forward(z)
 
-        if not args.regression_delta:
-            a_m = a_m + input[:, 0].unsqueeze(1)
+        # if not args.regression_delta:
+        #     a_m = a_m + input[:, 0].unsqueeze(1)
 
         marginal_likelihood = torch.sum((y - wave) ** 2) / wave.size(0) / wave.size(1)
 
@@ -122,8 +122,8 @@ def AE_val_loop(models, data_loader, epoch, args, saveResult=True):
         a_m, a_s, z = enc.forward((wave, dis))
         y = dec.forward(z)
 
-        if not args.regression_delta:
-            a_m = a_m + input[:, 0].unsqueeze(1)
+        # if not args.regression_delta:
+        #     a_m = a_m + input[:, 0].unsqueeze(1)
 
         marginal_likelihood = torch.sum((y - wave) ** 2) / wave.size(0) / wave.size(1)
 
@@ -163,7 +163,7 @@ def AE_val_loop(models, data_loader, epoch, args, saveResult=True):
                     if args.val_plot:
                         import matplotlib.pyplot as plt
                         plt.subplot(2,1,1)
-                        print('plotshape', wave.data[0].cpu().numpy().shape)
+                        # print('plotshape', wave.data[0].cpu().numpy().shape)
                         plt.plot(wave.data[0].cpu().numpy())
                         plt.title('raw')
                         plt.subplot(2, 1, 2)
