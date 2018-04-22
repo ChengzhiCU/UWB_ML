@@ -17,7 +17,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils import data
 import torch
 
-parser = argparse.ArgumentParser(description='RF-Sleep Training Script')
+parser = argparse.ArgumentParser(description='UWB Training Script')
 parser.add_argument('--workers', '-j', default=1, type=int, help='number of data loading workers')
 parser.add_argument('--batch', type=int, default=64, help='input batch size')
 parser.add_argument('--epochs', default=30, type=int, help='number of epochs to run')
@@ -27,8 +27,8 @@ parser.add_argument('--cnn_width', default=16, type=int, help='number of channel
 parser.add_argument('--checkpoint', type=str, help='location of the checkpoint to load')
 parser.add_argument('--enc_type', default='combined_dis', type=str, help='type of models') #mlp, cnn, npn, combined_dis
 # parser.add_argument('--data_filename', default='all_698.npy', type=str, help='type of models')
-parser.add_argument('--data_filename', default='all_436.npy', type=str, help='type of models')
-# parser.add_argument('--data_filename', default='all_258.npy', type=str, help='type of models')
+# parser.add_argument('--data_filename', default='all_436.npy', type=str, help='type of models')
+parser.add_argument('--data_filename', default='all_258.npy', type=str, help='type of models')
 parser.add_argument('--loss_type', default='L1', type=str, help='type of models')
 parser.add_argument('--output', default=time.strftime('%m-%d-%H-%M'),
                     type=str, help='folder to output model checkpoints')

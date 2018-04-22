@@ -21,12 +21,13 @@ class BottleNeck1d_3(nn.Module):
     dropout used when net is wide
     """
 
-    def __init__(self, in_channels, hidden_channels, out_channels, stride, kernel_size, group_num=1):
+    def __init__(self, in_channels, hidden_channels, out_channels, stride, kernel_size, group_num=1, use_bn=True):
 
         super(BottleNeck1d_3, self).__init__()
         self.stride = stride
         self.in_channels = in_channels
         self.out_channels = out_channels
+        self.use_bn = use_bn
 
         if stride != 1 or in_channels != out_channels:
             self.shortcut = nn.Conv1d(in_channels, out_channels, kernel_size=1, stride=stride, padding=0)
@@ -49,9 +50,14 @@ class BottleNeck1d_3(nn.Module):
             y = self.shortcut(x)
         else:
             y = x
-        x = F.relu(self.bn1(self.conv1(x)))
-        x = F.relu(self.bn2(self.conv2(x)))
-        x = self.bn3(self.conv3(x))
+        if self.use_bn:
+            x = F.relu(self.bn1(self.conv1(x)))
+            x = F.relu(self.bn2(self.conv2(x)))
+            x = self.bn3(self.conv3(x))
+        else:
+            x = F.relu(self.conv1(x))
+            x = F.relu(self.conv2(x))
+            x = self.conv3(x)
 
         x = F.relu(x + y)
         return x
@@ -80,24 +86,27 @@ class Enc(nn.Module):
             self.fc2 = NPNLinear(width, 1)
             # self.nonlinear2 = NPNSigmoid()
         elif self.type == 'cnn':
-            width = 32
+            width = 8
+            use_bn=False
             self.conv0 = nn.Conv1d(1, width, kernel_size=3, stride=2, padding=5)
             self.block1 = BottleNeck1d_3(in_channels=width, hidden_channels=width//2,
-                                         out_channels=width * 2, stride=2, kernel_size=3, group_num=width//4)
+                                         out_channels=width * 2, stride=2, kernel_size=3, group_num=width//4, use_bn=use_bn)
             self.block2 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width//2,
-                                         out_channels=width * 2, stride=2, kernel_size=3, group_num=width//4)
+                                         out_channels=width * 2, stride=2, kernel_size=3, group_num=width//4, use_bn=use_bn)
             self.block3 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width,
-                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2)
+                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2, use_bn=use_bn)
             self.block4 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
-                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2)
+                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2, use_bn=use_bn)
             self.block5 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width,
-                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2)
+                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2, use_bn=use_bn)
             # 16 left
             self.pooling = nn.AvgPool1d(kernel_size=4, stride=4)
             # 4 left
             self.fc1 = nn.Linear(width * 4 * 4, width * 4 * 4)
-            self.fc2 = nn.Linear(width * 4 * 4, 1)
-            self.dropout = nn.Dropout(0.1)
+            self.dropout1 = nn.Dropout(p=0.2)
+            self.dropout2 = nn.Dropout(p=0.2)
+            self.fc2 = nn.Linear(width * 4 * 4, width * 4 * 4)
+            self.fc3 = nn.Linear(width * 4 * 4, 1)
         elif self.type == 'cnn1':
             width = args.cnn_width
             self.conv0 = nn.Conv1d(1, width, kernel_size=3, stride=2, padding=4)
@@ -116,6 +125,36 @@ class Enc(nn.Module):
             # 16 left
             self.pooling = nn.AvgPool1d(kernel_size=8, stride=8)
             self.fc1 = nn.Linear(width * 4, 1)
+        elif self.type == 'cnn2':
+            width = 8
+            use_bn = False
+            self.conv0 = nn.Conv1d(1, width, kernel_size=3, stride=2, padding=5)
+            self.block1 = BottleNeck1d_3(in_channels=width, hidden_channels=width,
+                                         out_channels=width * 2, stride=2, kernel_size=3, group_num=width // 4,
+                                         use_bn=use_bn)
+            self.block2 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width,
+                                         out_channels=width * 2, stride=2, kernel_size=3, group_num=width // 4,
+                                         use_bn=use_bn)
+            self.block3 = BottleNeck1d_3(in_channels=width * 2, hidden_channels=width*2,
+                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width // 2,
+                                         use_bn=use_bn)
+            self.block4 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width*2,
+                                         out_channels=width * 4, stride=2, kernel_size=3, group_num=width // 2,
+                                         use_bn=use_bn)
+            self.block5 = BottleNeck1d_3(in_channels=width * 4, hidden_channels=width*4,
+                                         out_channels=width * 8, stride=2, kernel_size=3, group_num=width,
+                                         use_bn=use_bn)
+            self.block6 = BottleNeck1d_3(in_channels=width * 8, hidden_channels=width * 4,
+                                         out_channels=width * 8, stride=2, kernel_size=3, group_num=width,
+                                         use_bn=use_bn)
+            # 8 left
+            self.pooling = nn.AvgPool1d(kernel_size=8, stride=8)
+            # 4 left
+            self.fc1 = nn.Linear(width * 8, width * 8)
+            self.dropout1 = nn.Dropout(p=0.2)
+            self.dropout2 = nn.Dropout(p=0.2)
+            self.fc2 = nn.Linear(width * 8, width * 8)
+            self.fc3 = nn.Linear(width * 8, 1)
         elif self.type == 'combined':
             width = 16
             self.conv0 = nn.Conv1d(1, width, kernel_size=5, stride=2, padding=2)
@@ -131,7 +170,7 @@ class Enc(nn.Module):
                                          out_channels=width * 4, stride=2, kernel_size=3, group_num=width//2)
             # 16 left
             self.pooling = nn.AvgPool1d(kernel_size=8, stride=8)
-            self.fc1 = NPNLinear(width * 4, width * 16, dual_input=False, first_layer_assign=False)
+            self.fc1 = NPNLinear(width * 8, width * 16, dual_input=False, first_layer_assign=False)
             self.nonlinear1 = NPNRelu()
             # self.dropout1 = NPNDropout(self.fc_drop)
             self.fc2 = NPNLinear(width * 16, 1)
@@ -198,8 +237,10 @@ class Enc(nn.Module):
             x = x.view(x_size[0], x_size[1] * x_size[2])
 
             x = F.relu(self.fc1(x))
-            x = self.dropout(x)
-            x = self.fc2(x)
+            x = self.dropout1(x)
+            x = F.relu(self.fc2(x))
+            x = self.dropout2(x)
+            x = self.fc3(x)
             return x
         elif self.type == 'cnn1':
             x = x.unsqueeze(1)
@@ -213,6 +254,21 @@ class Enc(nn.Module):
             x = self.pooling(x)
             x = x.squeeze(2)
             x = self.fc1(x)
+            return x
+        elif self.type == 'cnn2':
+            x = x.unsqueeze(1)
+            x = self.conv0(x)
+            # x = self.block0.forward(x)
+            x = self.block1.forward(x)
+            x = self.block2.forward(x)
+            x = self.block3.forward(x)
+            x = self.block4.forward(x)
+            x = self.block5.forward(x)
+            x = self.block6.forward(x)
+            x = self.pooling(x)
+            x = x.squeeze(2)
+            x = F.relu(self.fc1(x))
+            x = self.fc3(x)
             return x
         elif self.type == 'combined':
             x = x.unsqueeze(1)
