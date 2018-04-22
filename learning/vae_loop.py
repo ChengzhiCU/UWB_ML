@@ -193,10 +193,10 @@ def vae_val_loop(models, data_loader, epoch, args, saveResult=False):
         scipy.io.savemat(os.path.join(config.MAT_PLOT_PATH,
                                       args.parsed_folder.split('/')[-1] + '_' + args.output.split('/')[-1]), datasave)
 
-    string_out = "val loss = {} certainty = {}  mse_square_loss = {}  average meter = {}\n" \
+    string_out = "val loss = {} certainty = {}  rmse_square_loss = {}  average meter = {}\n" \
                  "ELBO = {}   marginal_likelihood = {}   KL_divergence = {}\n" \
         .format(round(loss_all / loss_cnt, 3), round((loss_var_all / loss_cnt) ** 0.5, 3),
-                round(loss_mse_all / loss_cnt, 3), round(loss_abs_all / loss_cnt, 3), round(loss_ELBO_all / loss_cnt, 3),
+                round((loss_mse_all / loss_cnt) ** 0.5, 3), round(loss_abs_all / loss_cnt, 3), round(loss_ELBO_all / loss_cnt, 3),
                 round(loss_marginal_likelihood_all / loss_cnt, 3), round(loss_KL_divergence_all / loss_cnt, 3))
     print(string_out)
     args.fp.write(string_out)

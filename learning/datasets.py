@@ -27,6 +27,7 @@ class UWBDataset(data.Dataset):
                 self.index_list = np.load(train_index_file)
                 self.labeled_data['mask'] = np.ones_like(self.labeled_data['label'], dtype=np.float32)
 
+            feature[:, 0] -= 0.5689  # remove LOS bias
             self.dis = feature[:, 0]
             wave = self.labeled_data['wave']
             # if wave_cut:
@@ -84,6 +85,8 @@ class UWBDataset(data.Dataset):
 
             wave = np.concatenate((labeled_wave, unlab_wave), axis=0)
             feature = np.concatenate((labeled_feature, unlab_feature), axis=0)
+
+            feature[:, 0] -= 0.5689  # remove LOS bias
             self.dis = feature[:, 0]
 
             self.labeled_data['wave'] = wave

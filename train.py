@@ -204,8 +204,8 @@ if args.evaluate:
 
 best_meter_abs_metric_val = 99999999999
 best_meter_abs_metric_test = 99999999999
-best_rmse_metric_val = 99999999999
-best_rmse_metric_test = 99999999999
+best_mse_metric_val = 99999999999
+best_mse_metric_test = 99999999999
 best_rmse_epoch = 0
 best_epoch = 0
 
@@ -220,7 +220,7 @@ for epoch in range(args.epochs):
                                     epoch, args)
         train_time_cost = time.time() - train_start_time
         infer_start_time = time.time()
-        rmse_metric, abs_metric = vae_val_loop(models, val_dataloader, epoch, args)
+        mse_metric, abs_metric = vae_val_loop(models, val_dataloader, epoch, args)
         infer_time_cost = time.time() - infer_start_time
     elif args.enc_type == 'AE':
         train_start_time = time.time()
@@ -228,7 +228,7 @@ for epoch in range(args.epochs):
                                     epoch, args)
         train_time_cost = time.time() - train_start_time
         infer_start_time = time.time()
-        rmse_metric, abs_metric = AE_val_loop(models, val_dataloader, epoch, args)
+        mse_metric, abs_metric = AE_val_loop(models, val_dataloader, epoch, args)
         infer_time_cost = time.time() - infer_start_time
     elif args.enc_type == 'vaemlp':
         train_start_time = time.time()
@@ -236,7 +236,7 @@ for epoch in range(args.epochs):
                                     epoch, args)
         train_time_cost = time.time() - train_start_time
         infer_start_time = time.time()
-        rmse_metric, abs_metric = vaeMlp_val_loop(models, val_dataloader, epoch, args)
+        mse_metric, abs_metric = vaeMlp_val_loop(models, val_dataloader, epoch, args)
         infer_time_cost = time.time() - infer_start_time
     else:
         train_start_time = time.time()
@@ -244,42 +244,42 @@ for epoch in range(args.epochs):
                                             epoch, args)
         train_time_cost = time.time() - train_start_time
         infer_start_time = time.time()
-        rmse_metric, abs_metric = val_loop(models, val_dataloader, epoch, args)
+        mse_metric, abs_metric = val_loop(models, val_dataloader, epoch, args)
         infer_time_cost = time.time() - infer_start_time
     print('train time = {}   infer time = {}'.format(train_time_cost, infer_time_cost))
 
-    if abs_metric < best_meter_abs_metric_val:  # not finished...
+    if mse_metric < best_mse_metric_val:  # not finished...
         best_meter_abs_metric_val = abs_metric
-        best_rmse_metric_val = rmse_metric
+        best_mse_metric_val = mse_metric
         best_epoch = epoch
         save_model(model_names, models, args.output, epoch, best_meter_abs_metric_val)  # save models to one zip file
         if args.enc_type == 'vae' or args.enc_type == 'vae_1':
-            best_rmse_metric_test, best_meter_abs_metric_test = vae_val_loop(models, test_dataloader, epoch,
-                                                                             args, saveResult=True)
-        elif args.enc_type == 'AE':
-            best_rmse_metric_test, best_meter_abs_metric_test = AE_val_loop(models, test_dataloader, epoch,
+            best_mse_metric_test, best_meter_abs_metric_test = vae_val_loop(models, test_dataloader, epoch,
                                                                             args, saveResult=True)
+        elif args.enc_type == 'AE':
+            best_mse_metric_test, best_meter_abs_metric_test = AE_val_loop(models, test_dataloader, epoch,
+                                                                           args, saveResult=True)
         elif args.enc_type == 'vaemlp':
-            best_rmse_metric_test, best_meter_abs_metric_test = vaeMlp_val_loop(models, test_dataloader, epoch,
-                                                                                args, saveResult=True)
+            best_mse_metric_test, best_meter_abs_metric_test = vaeMlp_val_loop(models, test_dataloader, epoch,
+                                                                               args, saveResult=True)
         else:
-            best_rmse_metric_test, best_meter_abs_metric_test = val_loop(models, test_dataloader, epoch,
-                                                                         args, saveResult=True)
+            best_mse_metric_test, best_meter_abs_metric_test = val_loop(models, test_dataloader, epoch,
+                                                                        args, saveResult=True)
         str_print = 'test    meter error = {}  rmse loss = {}\n'.format(best_meter_abs_metric_test,
-                                                                        best_rmse_metric_test)
+                                                                        best_mse_metric_test ** 0.5)
         print(str_print)
         args.fp.write(str_print)
 
 total_time_cost = time.time() - start_time
 output_str = 'best val rmse loss = {},  epoch = {}\n time cost = {} \n train time = {} \n infer time = {}'\
-    .format(best_rmse_metric_val ** 0.5, best_epoch, total_time_cost, train_time_cost, infer_time_cost)
+    .format(best_mse_metric_val ** 0.5, best_epoch, total_time_cost, train_time_cost, infer_time_cost)
 print(output_str)
 args.fp.write(output_str)
-output_str2 = ' in meter average error = {}\n'.format(best_meter_abs_metric_val)
+output_str2 = ' in meter average error = {}\n '.format(best_meter_abs_metric_val)
 print(output_str2)
 args.fp.write(output_str2)
 
-output_str3 = 'best test meter loss = {}, best rmse loss = {} '.format(best_meter_abs_metric_test, best_rmse_metric_test ** 0.5)
+output_str3 = 'best test meter loss = {}, best rmse loss = {} '.format(best_meter_abs_metric_test, best_mse_metric_test ** 0.5)
 print(output_str3)
 args.fp.write(output_str3)
 args.fp.close()
@@ -295,6 +295,6 @@ datasave = np.load('../npy_bk/temp_' + args.output.split('/')[-1] + '.npy')[()]
 label = datasave['groundtruth']
 predict_y = datasave['predict_y']
 CDF_plot(np.abs(predict_y - label), 200, parsed_folder.split('/')[-1] + '_' + args.output.split('/')[-1]
-         + str(best_meter_abs_metric_test))
+         + str(best_mse_metric_test ** 0.5))
 
 

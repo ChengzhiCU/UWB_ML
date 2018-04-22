@@ -8,13 +8,14 @@ import random
 
 class ParseMAt:
     def __init__(self, overwrite, input_path=MatDataPath, save_path=PAESED_FILES, manual_split_data=False,
-                 data_percent=[0.1, 0.1, 0.8], save_npy=True):
+                 data_percent=[0.1, 0.1, 0.8], save_npy=True, save_index_file=True):
         self.overwrite = overwrite
         self.input_path = input_path
         self.save_path = save_path
         self.manual_split_data = manual_split_data
         self.data_percent = data_percent
         self.save_npy = save_npy
+        self.save_index_file = save_index_file
 
     def generate_data_all(self):
         """ generate all the data using multi process"""
@@ -121,17 +122,19 @@ class ParseMAt:
         data_num = all_label.shape[0]
 
         print(test_data_ind[:1000])
-        if not self.manual_split_data:
-            np.save(os.path.join(self.save_path, 'train_tr_ind_sep'), train_tr_data_ind)
-            np.save(os.path.join(self.save_path, 'train_val_ind_sep'), train_val_data_ind)
-            np.save(os.path.join(self.save_path, 'test_ind_sep'), test_data_ind)
-        else:
+        if self.manual_split_data and self.save_index_file:
             np.save(os.path.join(self.save_path, 'train_tr_ind_sep' + str(self.data_percent[0]) +
                                  '_' + str(self.data_percent[1])), train_tr_data_ind)
             np.save(os.path.join(self.save_path, 'train_val_ind_sep' + str(self.data_percent[0]) +
                                  '_' + str(self.data_percent[1])), train_val_data_ind)
             np.save(os.path.join(self.save_path, 'test_ind_sep' + str(self.data_percent[0])
                                  + '_' + str(self.data_percent[1])), test_data_ind)
+
+        elif self.save_index_file:
+            np.save(os.path.join(self.save_path, 'train_tr_ind_sep'), train_tr_data_ind)
+            np.save(os.path.join(self.save_path, 'train_val_ind_sep'), train_val_data_ind)
+            np.save(os.path.join(self.save_path, 'test_ind_sep'), test_data_ind)
+
 
 
 

@@ -101,7 +101,7 @@ def train_loop(models, data_loader, optimizers, lr_schedulers, epoch, args):
         return loss_all/loss_cnt
 
 
-def val_loop(models, data_loader, epoch, args, saveResult=True):
+def val_loop(models, data_loader, epoch, args, saveResult=False):
     for model in models:
         model.eval() ####depends
         set_dropout_mode(model, False)
@@ -163,18 +163,20 @@ def val_loop(models, data_loader, epoch, args, saveResult=True):
             if not args.regression_delta:
                 predict = predict + dis.unsqueeze(1)
             abs_loss = torch.sum(torch.abs(predict - labels)) / labels.size(1) / labels.size(0)
+            mse_loss = torch.sum((predict - labels) ** 2) / labels.size(1) / labels.size(0)
         else:
             predict = enc.forward(input)
             loss = full_mse_loss(predict, labels)
             if not args.regression_delta:
                 predict = predict + dis.unsqueeze(1)
             abs_loss = torch.sum(torch.abs(predict - labels)) / labels.size(1) / labels.size(0)
+            mse_loss = torch.sum((predict - labels) ** 2) / labels.size(1) / labels.size(0)
 
         loss_all += loss.data[0]
         abs_loss_all += abs_loss.data[0]
+        loss_mse_all += mse_loss.data[0]
 
         if 'npn' in args.enc_type or 'combined' in args.enc_type:
-            loss_mse_all += mse_loss.data[0]
             loss_var_all += var_loss.data[0]
         loss_cnt += 1.0
 
@@ -210,15 +212,15 @@ def val_loop(models, data_loader, epoch, args, saveResult=True):
                                       args.parsed_folder.split('/')[-1] + '_' + args.output.split('/')[-1]), datasave)
 
     if 'npn' in args.enc_type or 'combined' in args.enc_type:
-        string_out = "val loss = {}  certainty_variance = {} mse_square_loss = {} meter error = {}\n".format(loss_all/loss_cnt,
+        string_out = "val loss = {}  certainty_variance = {} rmse_square_loss = {} meter error = {}\n".format(loss_all/loss_cnt,
                                                                                    round((loss_var_all/loss_cnt) ** 0.5, 3),
-                                                                                   round(loss_mse_all/loss_cnt, 3),
+                                                                                   round((loss_mse_all/loss_cnt) ** 0.5, 3),
                                                                                    round(abs_loss_all / loss_cnt, 3))
         print(string_out)
         args.fp.write(string_out)
         return loss_mse_all/loss_cnt, abs_loss_all / loss_cnt
     else:
-        string_out = "val loss = {}  meter_error = {}\n".format(loss_all / loss_cnt, abs_loss_all / loss_cnt)
+        string_out = "rmse loss = {}  meter_error = {}\n".format((loss_mse_all / loss_cnt) ** 0.5, abs_loss_all / loss_cnt)
         print(string_out)
         args.fp.write(string_out)
-        return loss_all/loss_cnt, abs_loss_all / loss_cnt
+        return loss_mse_all/loss_cnt, abs_loss_all / loss_cnt
