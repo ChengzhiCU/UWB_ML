@@ -4,7 +4,7 @@ import numpy as np
 def filter_d(wave, feature, label):
   rise_time = feature[:,5]
   maxamp = feature[:,6]
-  mask1 = rise_time < 0 
+  mask1 = rise_time < 0
   mask2 = rise_time > 20
   mask = mask1 + mask2
   maskb = ~mask

@@ -77,3 +77,8 @@ def full_mse_loss(pred, label):
     loss = F.mse_loss(pred, label, size_average=False)
     loss = loss / pred.size(1) / pred.size(0)
     return loss
+
+def full_mse_loss_masked(pred, label, mask):
+    loss = torch.sum((pred - label) ** 2 * mask)
+    loss = loss / torch.sum(mask)
+    return loss

@@ -44,19 +44,6 @@ class ParseUnlabeledMAt:
         filelist = os.listdir(self.input_path)
         L = len(filelist)
 
-        all_list = [i for i in range(len(filelist))]
-        # shuffled_list = shuffle(all_list)
-        # print('shuffled_list', shuffled_list)
-        # train_point_ind = shuffled_list[:int(len(filelist) * 0.8)]
-        # test_point_ind = shuffled_list[int(len(filelist) * 0.8):]
-        train_point_ind = random.sample(all_list, int(len(filelist) * 0.8))
-        train_tr_point_ind = random.sample(train_point_ind, int(len(train_point_ind) * 0.8))
-        print(train_tr_point_ind)
-
-        train_tr_data_ind = []
-        train_val_data_ind = []
-        test_data_ind = []
-
         num=0
         for i, each in enumerate(filelist):
             matdata = scipy.io.loadmat(os.path.join(self.input_path, each))
@@ -65,38 +52,21 @@ class ParseUnlabeledMAt:
             wave_data = data_array[0]
             extracted_feature = data_array[1]
             label = data_array[2]
-            scene_index = np.ones_like(label, dtype=np.float32) * i
+            unlabeled = np.ones_like(label, dtype=np.float32) * (-1)
 
-            block_length = wave_data.shape[0]
-            num_list_block = [i for i in range(num, num+block_length)]
-            num += block_length
-            if i in train_point_ind:
-                if i in train_tr_point_ind:
-                    train_tr_data_ind = train_tr_data_ind + num_list_block
-                else:
-                    train_val_data_ind = train_val_data_ind + num_list_block
-            else:
-                test_data_ind = test_data_ind + num_list_block
-
-            data = {
-                'wave': wave_data,
-                'extracted_features': extracted_feature,
-                'label': label,
-                'subject': scene_index
-            }
             # np.save(os.path.join(self.save_path, each[:-4]), data)
             print('parse {} succeed'.format(os.path.join(self.save_path, each[:-4])))
 
-            if i==0:
+            if i == 0:
                 all_wave = wave_data
                 all_extracted_feature = extracted_feature
-                all_label = label
-                all_subject = scene_index
+                all_label = unlabeled
+                all_subject = unlabeled
             else:
                 all_wave = np.concatenate((all_wave, wave_data), axis=0)
                 all_extracted_feature = np.concatenate((all_extracted_feature, extracted_feature), axis=0)
-                all_label = np.concatenate((all_label, label), axis=0)
-                all_subject = np.concatenate((all_subject, scene_index), axis=0)
+                all_label = np.concatenate((all_label, unlabeled), axis=0)
+                all_subject = np.concatenate((all_subject, unlabeled), axis=0)
 
         all_data = {
             'wave': all_wave.astype(np.float32),
@@ -104,22 +74,8 @@ class ParseUnlabeledMAt:
             'label': all_label.astype(np.float32),
             'subject': all_subject.astype(np.float32)
         }
-        np.save(os.path.join(self.save_path, 'all_{}'.format(len(filelist))), all_data)
+        np.save(os.path.join(self.save_path, 'unlabeled_{}'.format(len(filelist))), all_data)
 
-        data_num = all_label.shape[0]
-        # train_data_ind = [i for i in range(data_num) if i%5]
-        # test_data_ind = [i for i in range(data_num) if  i%5==0]
-
-
-
-        # random
-        # train_data_ind = np.random.choice(data_num, int(data_num * 0.8), replace=False)
-        # or you can permutate and pick up the first 80% data
-        # test_data_ind = [i for i in range(data_num) if not i%5]
-        print(test_data_ind[:1000])
-        np.save(os.path.join(self.save_path, 'train_tr_ind_sep'), train_tr_data_ind)
-        np.save(os.path.join(self.save_path, 'train_val_ind_sep'), train_val_data_ind)
-        np.save(os.path.join(self.save_path, 'test_ind_sep'), test_data_ind)
 
 
 
