@@ -6,3 +6,4 @@ To run the file,
 
 python train.py
 
+or sh run.sh
