@@ -4,7 +4,7 @@
 
 Chengzhi Mao, Kangbo Lin, Tiancheng Yu, Yuan Shen
 
-http://www.cs.columbia.edu/~mcz/publication/UWB_ML.pdf
+https://ieeexplore.ieee.org/document/8647602
 
 
 To run the file, 
