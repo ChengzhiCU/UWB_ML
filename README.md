@@ -1,6 +1,6 @@
 # UWB_ML
 
-## Code for paper: A probabilistic learning approach to ranging error mitigation
+## Code for paper: A probabilistic learning approach to UWB ranging error mitigation
 
 To run the file, 
 
