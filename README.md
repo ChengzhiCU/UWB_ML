@@ -15,7 +15,6 @@ year={2018},
 volume={},
 number={},
 pages={1-6},
-keywords={learning (artificial intelligence);mean square error methods;neural nets;probability;telecommunication computing;ultra wideband communication;probabilistic learning;NLOS propagation;root mean square error;RMSE;probabilistic deep learning architecture;probabilistic neural networks;nonline-of-sight propagation;Ultra-Wide Band radio;UWB ranging error mitigation;Distance measurement;Probabilistic logic;Antenna measurements;Deep learning;Neural networks;Training;Uncertainty},
 doi={10.1109/GLOCOM.2018.8647602},
 ISSN={1930-529X},
 month={Dec},}
