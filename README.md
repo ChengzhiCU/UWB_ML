@@ -6,7 +6,7 @@ Chengzhi Mao, Kangbo Lin, Tiancheng Yu, Yuan Shen
 
 if you find this paper useful, please cite:
 
-'''
+```
 @INPROCEEDINGS{8647602,
 author={C. {Mao} and K. {Lin} and T. {Yu} and Y. {Shen}},
 booktitle={2018 IEEE Global Communications Conference (GLOBECOM)},
@@ -19,7 +19,7 @@ keywords={learning (artificial intelligence);mean square error methods;neural ne
 doi={10.1109/GLOCOM.2018.8647602},
 ISSN={1930-529X},
 month={Dec},}
-'''
+```
 
 https://ieeexplore.ieee.org/document/8647602
 
