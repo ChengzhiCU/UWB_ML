@@ -7,7 +7,7 @@ Chengzhi Mao, Kangbo Lin, Tiancheng Yu, Yuan Shen
 if you find this paper useful, please cite:
 
 ```
-@INPROCEEDINGS{8647602,
+@INPROCEEDINGS{Mao2018PL,
 author={C. {Mao} and K. {Lin} and T. {Yu} and Y. {Shen}},
 booktitle={2018 IEEE Global Communications Conference (GLOBECOM)},
 title={A Probabilistic Learning Approach to UWB Ranging Error Mitigation},
