@@ -10,6 +10,7 @@ http://www.cs.columbia.edu/~mcz/publication/UWB_ML.pdf
 
 To run the file, 
 
-python train.py
+`python train.py`
 
-or sh run.sh
+or 
+`sh run.sh`
